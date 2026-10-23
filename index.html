@@ -933,20 +933,22 @@ function ageUp(){
   if(p.mob){const m=p.mob;m.yrs++;m.heat=clamp(m.heat-8,0,100);
     if(!p.jail){
       if(chance(m.heat/250))L(mobBust('pertenencia a organización criminal'),'bad');
-      else if(chance(.05+m.rank*.01)){st('hea',-R(10,30));L('⚠️ Una banda rival te tiende una emboscada. Sales con heridas.','bad')}
+      else if(chance((.05+m.rank*.01)*(p.subs?.guard?.3:1))){st('hea',-R(10,30));L('⚠️ Una banda rival te tiende una emboscada. Sales con heridas.','bad')}
     }}
   // redes
   if(p.foll>0)p.foll=Math.floor(p.foll*(p.job?.fam||p.job?.sport?.97:.9));
   // dinero
-  let earn=0,cost=0;
-  if(p.job)earn+=p.job.sal*(p.job.pt?1:.8);
+  let earn=0,cost=0,untax=0;
+  if(p.job)earn+=p.job.sal;
   earn+=p.pension;
   if(p.monet)earn+=p.foll*.02;
   const home=p.assets.some(x=>x.k==='house'&&!x.rent);
   const withParents=!home&&!p.job&&!p.uni&&parents().length>0&&a<40;
   if(a>=18&&!p.jail)cost+=(home?5000:p.uni?4000:withParents?1500:(a<23&&!p.job?1500:9000))*W();
-  if(a>=18&&a<65&&!p.job&&!p.jail&&!p.retired&&!p.uni){earn+=3000*W();L(`🏛️ Cobras una ayuda por desempleo de ${fmt(3000*W())}${withParents?' y vives con tus padres':''}.`,'money')}
+  if(a>=18&&a<65&&!p.job&&!p.jail&&!p.retired&&!p.uni){earn+=3000*W();untax+=3000*W();L(`🏛️ Cobras una ayuda por desempleo de ${fmt(3000*W())}${withParents?' y vives con tus padres':''}.`,'money')}
   cost+=kidsOf().filter(r=>r.age<18).length*2500*W()+p.pets.length*300;
+  const kc=kidsCosts();if(kc>=1){cost+=kc;L(`🏫 Colegios y actividades de tus hijos: ${fmt(kc)}.`,'money')}
+  cost+=servicesYear();
   cost+=p.assets.reduce((s,x)=>s+(x.m||0),0);
   const rent=p.assets.filter(x=>x.rent).reduce((s,x)=>s+x.v*.045,0);earn+=rent;
   let bizT=0;
@@ -960,8 +962,14 @@ function ageUp(){
   if(p.biz.length)L(`🏢 Tus negocios ${bizT>=0?'ganan':'pierden'} ${fmt(Math.abs(bizT))} este año.`,bizT>=0?'good':'bad');
   if(rent)L(`🏘️ Cobras ${fmt(rent)} de alquileres.`,'money');
   earn+=yearSpecial();
-  if(p.mob&&!p.jail){const s=(2000+p.mob.rank*p.mob.rank*6000)*(.7+Math.random()*.6);earn+=s;L(`🕴️ Tu parte de los negocios de la familia: ${fmt(s)}.`,'money')}
-  if(a>=18&&!p.jail)cost+=Math.max(0,earn)*.5;
+  if(p.mob&&!p.jail){const s=(2000+p.mob.rank*p.mob.rank*6000)*(.7+Math.random()*.6);earn+=s;untax+=s;L(`🕴️ Tu parte de los negocios de la familia: ${fmt(s)}.`,'money')}
+  let tx=incomeTax(Math.max(0,earn-untax)),ptx=p.jail?0:propertyTax();
+  if(p.donated){tx=Math.max(0,tx-p.donated*.35);p.donated=0}
+  if(p.evade&&tx>0){const saved=tx*.5;tx-=saved;p.evaded=(p.evaded||0)+saved;
+    if(chance(.15)){const fine=p.evaded*3;p.evaded=0;p.evade=false;p.debt+=fine;p.record++;L(`🧾 ¡Inspección de Hacienda! Descubren que no lo declarabas todo. Multa de ${fmt(fine)}.`,'bad')}}
+  const totTax=tx+ptx;p.lastTax={inc:tx,prop:ptx};
+  if(totTax>=1){cost+=totTax;L(`🧾 Impuestos: ${fmt(tx)} de renta${ptx>=1?` y ${fmt(ptx)} de propiedades`:''}.`,'money')}
+  if(a>=18&&!p.jail)cost+=Math.max(0,earn-totTax)*.55;
   if(earn||cost){p.money+=earn-cost;L(`Ingresos ${fmt(earn)} · gastos ${fmt(cost)}`,'money')}
   let invT=0;p.invLast={};
   for(const x of INV){const amt=p.inv[x.k]||0;if(amt<1)continue;let r=x.mu+x.sd*gauss();if(x.k==='crypto'&&chance(.1))r=-.7;r=Math.max(-.95,r);p.inv[x.k]=amt*(1+r);p.invLast[x.k]=r;invT+=amt*r}
@@ -1114,7 +1122,28 @@ const OUTDOOR=[
  {k:'omush',e:'🍄',n:'Buscar setas',d:'Ojo con las venenosas',min:10,fn:()=>{if(chance(.12)){st('hea',-R(8,20));return 'Una de las setas no era comestible. Pasas la noche fatal.'}st('hap',R(2,4));return 'Llenas la cesta de setas buenísimas.'}},
  {k:'obird',e:'🦅',n:'Observar aves',d:'Paciencia',min:6,fn:()=>{st('hap',R(1,4));return `Ves ${pick(['un águila real','un martín pescador','una pareja de flamencos','un búho'])}.`}},
 ];
-const LISTS={a:ACTS,s:SOCIAL,c:CRIMES,j:JAIL_ACTS,m:MOB_ACTS,h:HUSTLE,o:OUTDOOR};
+const SPORT_ACTS=[
+ {k:'sfoot',e:'⚽',n:'Partido con amigos',d:'Gratis y divertido',min:6,fn:()=>{st('hea',R(1,4));st('hap',R(2,5));p.athl=clamp(p.athl+R(1,3),0,100);if(chance(.08)){st('hea',-R(5,12));return 'Te tuerces el tobillo en una entrada.'}return pick(['Metes un golazo por la escuadra.','Fallas un penalti, pero ganáis igual.'])}},
+ {k:'sswim',e:'🏊',n:'Bono de piscina',d:'Salud y forma física',min:6,cost:()=>200,fn:()=>{st('hea',R(2,5));p.athl=clamp(p.athl+R(2,4),0,100);addStress(-3);return 'Haces largos hasta que se te arrugan los dedos.'}},
+ {k:'stennis',e:'🎾',n:'Clases de tenis',d:'Forma física y amigos',min:8,cost:()=>600,fn:()=>{p.athl=clamp(p.athl+R(2,5),0,100);st('hap',R(1,4));if(chance(.2)){const f=addFriend();return `Tu compañero de dobles, ${f.first}, se convierte en tu amigo.`}return 'Tu revés mejora una barbaridad.'}},
+ {k:'smart',e:'🥋',n:'Artes marciales',d:'Disciplina y menos estrés',min:6,cost:()=>500,fn:()=>{p.athl=clamp(p.athl+R(2,5),0,100);st('hea',R(1,3));addStress(-5);return pick(['Consigues un cinturón nuevo.','Rompes una tabla de un golpe. Duele, pero mola.'])}},
+ {k:'sbike',e:'🚵',n:'Ruta en bici de montaña',d:'Adrenalina',min:10,fn:()=>{if(chance(.12)){st('hea',-R(5,15));return 'Te comes una piedra y sales volando por encima del manillar.'}p.athl=clamp(p.athl+R(1,4),0,100);st('hap',R(3,6));return 'Bajas la montaña a toda velocidad. Increíble.'}},
+ {k:'srun',e:'🏃',n:'Correr una maratón',d:'Inscripción',min:16,cost:()=>80,fn:()=>{if(chance(clamp(p.athl/90,.1,.95))){st('hap',R(6,12));p.athl=clamp(p.athl+3,0,100);return `🏅 Terminas los 42 kilómetros en ${R(3,5)} horas. ¡Lo has conseguido!`}st('hea',-R(2,6));return 'Abandonas en el kilómetro 30 con calambres.'}},
+ {k:'smatch',e:'🏟️',n:'Ver un partido en el estadio',d:'Ambiente único',min:6,cost:()=>80,fn:()=>{st('hap',R(3,7));return chance(.5)?'¡Gana tu equipo! Te quedas sin voz.':'Tu equipo pierde en el último minuto. Qué rabia.'}},
+ {k:'strain',e:'🏋️',n:'Sesión con entrenador personal',d:'Mucha forma física',min:16,cost:()=>100,fn:()=>{p.athl=clamp(p.athl+R(3,6),0,100);st('loo',R(0,1));return 'Tu entrenador te hace sudar como nunca.'}},
+ {k:'sski',e:'⛷️',n:'Viaje de esquí',d:'Felicidad, con riesgo',min:8,cost:()=>1500,fn:()=>{if(chance(.1)){st('hea',-R(8,20));return 'Te caes en una pista negra y acabas con la pierna escayolada.'}st('hap',R(8,14));addStress(-8);return 'Una semana de nieve, sol y chocolate caliente.'}},
+ {k:'sgolf',e:'⛳',n:'Jornada en un club de golf',d:'Contactos de trabajo',min:18,cost:()=>800,fn:()=>{st('hap',R(2,5));addStress(-4);if(p.job&&!p.job.pt){p.job.perf=clamp(p.job.perf+R(3,8),0,100);return 'Juegas con un pez gordo del sector. Tu jefe se entera y le encanta.'}return 'Pierdes cinco bolas en el lago, pero lo pasas bien.'}},
+];
+const SPEND=[
+ {k:'gtreat',e:'🍰',n:'Darte un capricho',d:'Dulces, series y sofá',min:6,cost:()=>30,fn:()=>{st('hap',R(1,3));addStress(-3);return pick(['Una tarta entera para ti solo.','Maratón de series con palomitas.'])}},
+ {k:'gshop',e:'🛍️',n:'Ir de compras',d:'Felicidad y aspecto',min:12,cost:()=>250,fn:()=>{st('hap',R(3,7));st('loo',R(0,2));return pick(['Vuelves con más bolsas de las que puedes cargar.','Encuentras unas rebajas increíbles.'])}},
+ {k:'gfam',e:'🍽️',n:'Invitar a la familia a cenar',d:'Mejora la relación',min:18,cost:()=>300,fn:()=>{p.rels.filter(r=>['parent','sibling','child','spouse','partner'].includes(r.role)&&r.alive).forEach(r=>r.bond=clamp(r.bond+R(3,7),0,100));st('hap',R(2,5));return 'Cena larga, sobremesa todavía más larga.'}},
+ {k:'gparty',e:'🎉',n:'Dar una fiesta en casa',d:'Amigos y felicidad',min:16,cost:()=>400,fn:()=>{p.rels.filter(r=>r.role==='friend'&&r.alive).forEach(r=>r.bond=clamp(r.bond+R(4,8),0,100));st('hap',R(4,8));if(chance(.3)){const f=addFriend();return `La fiesta es un éxito. Conoces a ${f.first}.`}return 'Los vecinos se quejan del ruido, pero merece la pena.'}},
+ {k:'ggifts',e:'🎁',n:'Regalos para toda la familia',d:'Todos te quieren más',min:12,cost:()=>500,fn:()=>{p.rels.filter(r=>r.alive).forEach(r=>r.bond=clamp(r.bond+R(2,5),0,100));st('hap',3);return 'Aciertas con casi todos los regalos.'}},
+ {k:'gdonate',e:'💝',n:'Donar a una ONG',d:'Karma y desgrava',min:16,special:()=>donate()},
+ {k:'grenov',e:'🛠️',n:'Reformar tu casa',d:'Sube su valor',min:18,cost:()=>15000,req:()=>p.assets.some(a=>a.k==='house')?'':'Necesitas una casa',fn:()=>{const h=p.assets.find(a=>a.k==='house');const up=15000*(.8+Math.random()*.9);h.v+=up;st('hap',5);return `Reformas tu casa: ${h.n.toLowerCase()}. Ahora vale ${fmt(h.v)}.`}},
+];
+const LISTS={a:ACTS,s:SOCIAL,c:CRIMES,j:JAIL_ACTS,m:MOB_ACTS,h:HUSTLE,o:OUTDOOR,sp:SPORT_ACTS,g:SPEND};
 function costOf(a){return a.cost?a.cost():0}
 const limOf=a=>a.limit||LIMITS[a.k]||PER_YEAR;
 function whyNot(a){return p.age<(a.min||0)?`Desde los ${a.min} años`:used(a.k)>=limOf(a)?`Ya van ${limOf(a)} este año`:(a.req&&a.req())||''}
@@ -1554,6 +1583,8 @@ function yearLife(a){
   const nl=langOf(p.c);p.langs=p.langs||{};
   if((p.langs[nl]||0)<100){const b=p.langs[nl]||0;p.langs[nl]=Math.min(100,b+R(4,10));if(b<50&&p.langs[nl]>=50)L(`🗣️ A base de vivir aquí, ya hablas ${nl.toLowerCase()} con soltura.`,'good')}
   for(const r of kidsOf()){if(r.age>=18)continue;const s=r.st||(r.st={sma:R(20,90),hea:R(70,100),loo:R(20,90),hap:R(60,95)});
+    if(r.age>=6){const sc=SCH(r);s.sma=clamp(s.sma+R(0,sc.sma),0,100);if(sc.bond)r.bond=clamp(r.bond+sc.bond,0,100)}
+    if(r.ks&&r.age>=4){s.hea=clamp(s.hea+2,0,100);s.hap=clamp(s.hap+1,0,100);r.bond=clamp(r.bond+1,0,100)}
     if(p.style==='estricto'){s.sma=clamp(s.sma+R(0,2),0,100);r.bond=clamp(r.bond-R(0,2),0,100)}
     else if(p.style==='permisivo'){s.hap=clamp(s.hap+R(0,2),0,100);s.sma=clamp(s.sma-R(0,1),0,100);r.bond=clamp(r.bond+1,0,100)}
     else{s.sma=clamp(s.sma+R(0,1),0,100);s.hap=clamp(s.hap+R(0,1),0,100)}}
@@ -1955,6 +1986,52 @@ function renderHall(){
     +`<p class="eyebrow" style="margin-top:10px!important">📆 Desafío de hoy</p>`+(daily.length?daily.map((l,i)=>`<div class="row"><div class="lead"><span class="em" aria-hidden="true">${medal(i)}</span><div><b>${esc(l.n)}</b><small>${+l.age||0} años · jugada por ${who(l.uid)}</small></div></div></div>`).join(''):'<p class="note">Nadie ha terminado aún la vida de hoy. Empiézala desde ☰ Menú.</p>');
 }
 
+/* ---------- colegios, deporte infantil, impuestos y servicios ---------- */
+const SCHOOLS=[{k:'pub',e:'🏫',n:'Pública',c:0,sma:1,d:'Gratis'},{k:'conc',e:'🏛️',n:'Concertada',c:1500,sma:2,d:'Algo mejor y barata'},
+  {k:'priv',e:'🎓',n:'Privada',c:8000,sma:3,d:'Más inteligencia'},{k:'elite',e:'🏰',n:'Internado de élite',c:30000,sma:4,bond:-2,d:'Lo mejor, pero lejos de casa'}];
+const SCH=r=>SCHOOLS.find(x=>x.k===(r.sch||'pub'))||SCHOOLS[0];
+const KSPORTS=[{k:'foot',e:'⚽',n:'fútbol',c:400},{k:'swim',e:'🏊',n:'natación',c:600},{k:'dance',e:'🩰',n:'ballet',c:900},{k:'martial',e:'🥋',n:'kárate',c:700},
+  {k:'tennis',e:'🎾',n:'tenis',c:1200},{k:'basket',e:'🏀',n:'baloncesto',c:500},{k:'horse',e:'🏇',n:'equitación',c:4000}];
+const KS=r=>KSPORTS.find(x=>x.k===r.ks);
+function kidsCosts(){let c=0;for(const r of kidsOf()){if(r.age>=6&&r.age<18)c+=SCH(r).c*W();if(r.ks&&r.age>=4&&r.age<18)c+=KS(r).c*W()}return c}
+function schoolPick(r){const map={};SCHOOLS.forEach(x=>map[x.k]=()=>{r.sch=x.k;if(x.k==='elite')r.bond=clamp(r.bond-5,0,100);save();render();result(`${x.e} ${r.first} irá a un colegio ${x.k==='elite'?'internado de élite':x.n.toLowerCase()}${x.c?` por ${fmt(x.c*W())} al año`:''}.`)});
+  openModal(`<p class="eyebrow">🏫 Colegio de ${r.first}</p><h2>¿A qué colegio va?</h2><p class="muted">Se paga cada año mientras tenga entre 6 y 17 años. Un colegio mejor le hace más listo.</p><div class="choices">${SCHOOLS.map(x=>`<button class="btn ghost" data-k="${x.k}">${x.e} ${x.n} · ${x.c?`${fmt(x.c*W())} al año`:'gratis'} · ${x.d}${(r.sch||'pub')===x.k?' (actual)':''}</button>`).join('')}</div>`,map)}
+function kidSportPick(r){const map={none:()=>{r.ks=null;save();render();result(`${r.first} deja las actividades deportivas.`)}};
+  KSPORTS.forEach(x=>map[x.k]=()=>{r.ks=x.k;r.bond=clamp(r.bond+3,0,100);save();render();result(`${x.e} Apuntas a ${r.first} a ${x.n} por ${fmt(x.c*W())} al año. ¡Le encanta!`)});
+  openModal(`<p class="eyebrow">⚽ Deporte de ${r.first}</p><h2>¿A qué le apuntas?</h2><p class="muted">Se paga cada año. Mejora su salud, su felicidad y vuestra relación.</p><div class="choices">${KSPORTS.map(x=>`<button class="btn ghost" data-k="${x.k}">${x.e} ${x.n[0].toUpperCase()+x.n.slice(1)} · ${fmt(x.c*W())} al año${r.ks===x.k?' (actual)':''}</button>`).join('')}<button class="btn ghost" data-k="none">Ninguno</button></div>`,map)}
+
+function incomeTax(x){const b=[12000,35000,70000].map(v=>v*W()),rt=[0,.2,.3,.42];let t=0;
+  for(let i=0;i<4;i++){const lo=i?b[i-1]:0,hi=i<3?b[i]:Infinity;if(x>lo)t+=(Math.min(x,hi)-lo)*rt[i]}return t}
+function propertyTax(){return p.assets.reduce((s,x)=>s+(x.k==='house'?x.v*.005:['car','moto','boat','plane'].includes(x.k)?x.v*.01:0),0)}
+X.tax=a=>{if(a==='evade'){p.evade=!p.evade;return done(p.evade?'🙈 Empiezas a declarar solo la mitad de lo que ganas. Ojo con Hacienda.':'🧾 Vuelves a declarar todo. Duermes más tranquilo.')}};
+function donate(){const opts=[100,1000,10000].filter(v=>v<=p.money),map={};
+  if(!opts.length)return result(`Necesitas al menos ${fmt(100)} para donar.`);
+  opts.forEach(v=>map['d'+v]=()=>{use('gdonate');p.money-=v;p.donated=(p.donated||0)+v;p.karma+=v>=10000?5:v>=1000?3:1;st('hap',3);
+    done(`💝 Donas ${fmt(v)} a ${pick(['un banco de alimentos','una ONG de ayuda a la infancia','una protectora de animales','la investigación contra el cáncer'])}. Te desgravará en los impuestos.`)});
+  openModal(`<p class="eyebrow">💝 Donar</p><h2>¿Cuánto donas?</h2><p class="muted">Sube tu karma y te descuenta un 35 % de lo donado en los impuestos del año.</p><div class="choices">${opts.map(v=>`<button class="btn ghost" data-k="d${v}">${fmt(v)}</button>`).join('')}</div>`,map)}
+
+const SERVICES=[
+ {k:'stream',e:'📺',n:'Plataformas de series y música',c:200,d:'Felicidad',fx:()=>st('hap',2)},
+ {k:'gym',e:'🏋️',n:'Cuota anual del gimnasio',c:400,d:'Salud y forma física',fx:()=>{st('hea',2);p.athl=clamp(p.athl+2,0,100)}},
+ {k:'clean',e:'🧹',n:'Asistenta del hogar',c:6000,d:'Menos estrés',fx:()=>addStress(-8)},
+ {k:'nanny',e:'🍼',n:'Niñera',c:9000,d:'Menos estrés con hijos pequeños',req:()=>kidsOf().some(r=>r.age<12),fx:()=>addStress(-6)},
+ {k:'trainer',e:'💪',n:'Entrenador personal',c:8000,d:'Mucha forma física',fx:()=>{p.athl=clamp(p.athl+4,0,100);st('loo',1)}},
+ {k:'chef',e:'👨‍🍳',n:'Chef personal',c:25000,d:'Salud',fx:()=>st('hea',3)},
+ {k:'driver',e:'🚘',n:'Chófer',c:20000,d:'Menos estrés',fx:()=>addStress(-5)},
+ {k:'guard',e:'🕶️',n:'Guardaespaldas',c:60000,d:'Te protege de emboscadas',fx:()=>{}}];
+function servicesYear(){if(p.jail||p.age<18)return 0;p.subs=p.subs||{};let c=0;const on=[];
+  for(const s of SERVICES){if(!p.subs[s.k])continue;if(s.req&&!s.req()){p.subs[s.k]=false;continue}c+=s.c*W();s.fx();on.push(s.e)}
+  if(c)L(`🛎️ Servicios contratados ${on.join('')}: ${fmt(c)} al año.`,'money');return c}
+X.svc=(a,k)=>{const s=SERVICES.find(x=>x.k===k);if(!s)return;p.subs=p.subs||{};p.subs[k]=!p.subs[k];
+  return done(p.subs[k]?`${s.e} Contratas: ${s.n.toLowerCase()} por ${fmt(s.c*W())} al año.`:`${s.e} Das de baja: ${s.n.toLowerCase()}.`)};
+function renderMoney(){
+  if(p.age<16)return '';
+  const lt=p.lastTax;
+  let h=`<h3>🧾 Impuestos</h3><p class="note">${lt?`El año pasado pagaste ${fmt(lt.inc)} de renta y ${fmt(lt.prop)} por tus propiedades.`:'Cada año pagas impuestos por lo que ganas y por tus casas y vehículos.'} Hasta ${fmt(12000*W())} de ingresos no pagas renta; después, un 20 %, un 30 % y un 42 % por tramos.${p.evade?' ⚠️ Ahora mismo no declaras la mitad: cada año puede tocarte una inspección.':''}</p>${btn('tax','evade',p.evade?'🧾 Volver a declararlo todo':'🙈 Hacer trampa con los impuestos',0,1)}`;
+  if(p.age>=18){p.subs=p.subs||{};
+    h+=`<h3>🛎️ Servicios contratados</h3><p class="note">Se pagan cada año mientras los tengas.</p>`+SERVICES.map(s=>{const no=s.req&&s.req();return `<div class="row"><div><b>${s.e} ${s.n}</b><small>${fmt(s.c*W())} al año · ${s.d}</small></div>${btn('svc','toggle:'+s.k,p.subs[s.k]?'Dar de baja':'Contratar',!p.subs[s.k]&&s.req&&!s.req()||p.jail,!p.subs[s.k])}</div>`}).join('')}
+  return h}
+
 /* ---------- gente ---------- */
 function relMenu(r){
   if(!r.alive)return result(`🕊️ ${r.first} falleció a los ${r.age} años. Le echas de menos.`);
@@ -1969,12 +2046,14 @@ function relMenu(r){
   if(r.role==='partner')acts.push(['breakup','Romper']);
   if(r.role==='spouse')acts.push(['divorce','Divorciarse']);
   if(r.role==='friend')acts.push(['unfriend','Dejar de ser amigos']);
+  if(r.role==='child'&&r.age>=3&&r.age<18&&p.age>=18&&!p.jail)acts.push(['school',`${SCH(r).e} Colegio: ${SCH(r).n.toLowerCase()}`],['ksport',r.ks?`${KS(r).e} Deporte: ${KS(r).n}`:'⚽ Apuntarle a un deporte']);
   if(r.role==='child'&&r.age<18&&p.age>=18&&!p.jail)acts.push(['homework','📚 Ayudarle con los deberes'],['club',`⚽ Apuntarle a actividades (${fmt(300)})`],['spoil','🎁 Mimarle'],['ground','🚫 Castigarle']);
   if(pt&&p.age>=18&&!p.jail)acts.push(['date','🌹 Cita romántica']);
   if(r.role==='spouse'&&!r.honey&&!p.jail)acts.push(['honey',`🌴 Luna de miel (${fmt(3000)})`]);
   const once=['time','talk','gift','money','argue','baby','propose','homework','club','spoil','ground','date'];
   const map={close:closeModal};
   acts.forEach(([k])=>map[k]=()=>{if(once.includes(k))use(r.id+k);const t=relAction(r,k,bio);r.bond=clamp(r.bond,0,100);done(t)});
+  map.school=()=>schoolPick(r);map.ksport=()=>kidSportPick(r);
   openModal(`<p class="eyebrow">${relE(r)} ${label(r)} · ${r.age} años</p><h2>${r.first} ${r.last}</h2>${bar('Relación',r.bond)}<div class="choices">${acts.map(([k,t])=>`<button class="btn ghost" data-k="${k}" ${once.includes(k)&&full(r.id+k)?'disabled':''}>${t}</button>`).join('')}<button class="btn" data-k="close">Cerrar</button></div>`,map);
 }
 function relAction(r,k,bio){
@@ -2097,7 +2176,7 @@ function cards(kind,cls=''){
 }
 function renderActs(){
   if(p.jail)return `<div class="banner"><b>⛓️ ${p.age<18?'Centro de menores':'Prisión'}</b><p class="muted" style="margin:2px 0 0">Condena: ${p.jail.total} años · te quedan ${p.jail.left}. Antecedentes: ${p.record}.</p></div><h3>🧱 Vida entre rejas</h3>${cards('j')}<p class="note" style="margin-top:12px">Desde Gente puedes pedir visitas a tu familia.${p.mob?` ${MOBS[p.mob.i].n} sigue contando contigo.`:''}</p>`;
-  let h=`<h3>🎯 Actividades</h3>${cards('a')}`;
+  let h=`<h3>🎯 Actividades</h3>${cards('a')}<h3>⚽ Deporte</h3>${cards('sp')}<h3>💸 Gastos y caprichos</h3>${cards('g')}`;
   if(p.age>=13&&yearNow()>=2004)h+=`<h3>📱 Redes sociales</h3><p class="note">${cfmt(p.foll)} seguidores · fama ${fame()}/100${p.monet?' · 💸 monetizado':''}</p>${cards('s')}`;
   if(p.age>=12)h+=`<h3>🚔 Crimen</h3><p class="note">Puede salir bien… o acabar entre rejas. Antecedentes: ${p.record}${p.fugitive?' · ahora mismo te busca la policía':''}.</p>${cards('c','risk')}`;
   if(p.age>=18){
@@ -2154,7 +2233,7 @@ function renderCareer(){
   return h+renderLearn()+renderSpecial();
 }
 function renderPeople(){
-  const row=r=>`<button class="row person ${r.alive?'':'dead'}" data-rel="${r.id}"><div class="lead"><span class="em" aria-hidden="true">${relE(r)}</span><div><b>${r.first} ${r.last.split(' ')[0]}</b><small>${label(r)} · ${r.alive?`${r.age} años`:`† a los ${r.age}`}</small></div></div>${r.alive?`<div class="bondbar">${bar('',r.bond)}</div>`:''}</button>`;
+  const row=r=>`<button class="row person ${r.alive?'':'dead'}" data-rel="${r.id}"><div class="lead"><span class="em" aria-hidden="true">${relE(r)}</span><div><b>${r.first} ${r.last.split(' ')[0]}</b><small>${label(r)} · ${r.alive?`${r.age} años`:`† a los ${r.age}`}${r.role==='child'&&r.alive&&r.age>=6&&r.age<18?` · ${SCH(r).e} ${SCH(r).n.toLowerCase()}${r.ks?` · ${KS(r).e}`:''}`:''}</small></div></div>${r.alive?`<div class="bondbar">${bar('',r.bond)}</div>`:''}</button>`;
   const grp=(t,f)=>{const l=p.rels.filter(f);return l.length?`<h3>${t}</h3>${l.map(row).join('')}`:''};
   let h=`<div class="btns" style="margin-top:10px">${btn('fam','tree','🌳 Árbol genealógico',0,1)}${kidsOf().length?btn('fam','style',`👪 Crianza: ${p.style||'equilibrado'}`,0,1):''}</div>`+grp('🏡 Familia',r=>r.role==='parent'||r.role==='sibling')+grp('❤️ Pareja',r=>r.role==='partner'||r.role==='spouse')+grp('🧸 Hijos',r=>r.role==='child')+grp('🤝 Amigos',r=>r.role==='friend');
   if(p.grand?.length)h+=`<h3>👶 Nietos</h3>`+p.grand.map(x=>`<div class="row"><div class="lead"><span class="em" aria-hidden="true">${x.age<3?'👶':x.sex==='F'?'👧':'👦'}</span><div><b>${x.first}</b><small>${x.sex==='F'?'Nieta':'Nieto'} · ${x.age} años · de ${x.pn}</small></div></div></div>`).join('');
@@ -2179,6 +2258,7 @@ function renderAssets(){
   if(p.debt>0)h+=`<div class="btns"><button class="btn small" data-pay="1000" ${p.money<1?'disabled':''}>💳 Pagar ${fmt(1000)}</button><button class="btn small" data-pay="10000" ${p.money<1?'disabled':''}>💳 Pagar ${fmt(10000)}</button><button class="btn small ghost" data-pay="all" ${p.money<1?'disabled':''}>Pagar todo lo que pueda</button></div>`;
   const upkeep=p.assets.reduce((s,a)=>s+(a.m||0),0);
   h+=`<h3>🔑 Lo que tienes</h3>${upkeep?`<p class="note">Mantenimiento total: ${fmt(upkeep)} al año.</p>`:''}`+(p.assets.length?p.assets.map((a,i)=>`<div class="row"><div><b>${assetE(a)} ${a.n}</b><small>Vale ${fmt(a.v)}${a.m?` · mantenimiento ${fmt(a.m)}/año`:''}${a.rent?` · 🏘️ alquilada: +${fmt(a.v*.045)}/año`:''}</small></div><div class="btns">${a.k==='house'?`<button class="btn small ghost" data-rent="${i}" ${p.jail?'disabled':''}>${a.rent?'Dejar de alquilar':'Alquilar'}</button>`:''}<button class="btn small ghost" data-sell="${i}" ${p.jail?'disabled':''}>Vender</button></div></div>`).join(''):'<p class="note">Todavía no tienes nada a tu nombre.</p>');
+  h+=renderMoney();
   if(p.age>=18)h+=`<h3>📜 Testamento</h3><p class="note">${willText()}</p>${btn('fam','will','Cambiar testamento',0,1)}`;
   h+=`<h3>🏢 Tus negocios</h3>`+(p.biz.length?p.biz.map((b,i)=>`<div class="row"><div><b>${b.e} ${b.n}</b><small>Vale ${fmt(b.v)}${b.yrs?` · último año ${b.last>=0?'+':''}${fmt(b.last)}`:' · recién abierto'}</small></div><div class="btns"><button class="btn small ghost" data-bx="grow:${i}" ${p.money<b.v*.5||p.jail?'disabled':''}>Ampliar (${fmt(b.v*.5)})</button><button class="btn small ghost" data-bx="sell:${i}" ${p.jail?'disabled':''}>Vender</button></div></div>`).join(''):'<p class="note">No tienes negocios. Móntalos desde la tienda, en 🏢 Negocios.</p>');
   h+=`<h3>📈 Inversiones</h3>`+(p.age<18?'<p class="note">Podrás invertir a partir de los 18 años.</p>':INV.filter(x=>x.k!=='crypto'||yearNow()>=2010).map(x=>{const amt=p.inv[x.k]||0,r=p.invLast?.[x.k];return `<div class="row"><div><b>${x.e} ${x.n}</b><small>${amt>=1?`${fmt(amt)} invertido`:'Nada invertido'}${r!=null&&amt>=1?` · último año ${r>=0?'+':''}${Math.round(r*100)} %`:''} · riesgo ${x.r}</small></div><button class="btn small ghost" data-inv="${x.k}" ${p.jail||!p.alive?'disabled':''}>Gestionar</button></div>`}).join(''));
