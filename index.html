@@ -104,6 +104,7 @@ button.card:not(:disabled):hover{border-color:var(--accent)}
 @media (prefers-reduced-motion: reduce){.app.shake{animation:none}}
 .cpbox{width:100%;background:var(--sunk);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;font-family:var(--mono);font-size:12px;resize:vertical}
 .tut b{color:var(--accent)}
+.pos{color:var(--good)} .neg{color:var(--bad)}
 .traits{margin:-4px 0 0;font-size:12.5px;color:var(--muted)}
 .mem{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:340px;margin:0 auto}
 .memc{aspect-ratio:1;font-size:28px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);max-width:100%}
@@ -1018,7 +1019,9 @@ function ageUp(){
   if(p.donated){tx=Math.max(0,tx-p.donated*.35);p.donated=0}
   if(p.evade&&tx>0){const saved=tx*.5;tx-=saved;p.evaded=(p.evaded||0)+saved;
     if(chance(.15)){const fine=p.evaded*3;p.evaded=0;p.evade=false;p.debt+=fine;p.record++;L(`🧾 ¡Inspección de Hacienda! Descubren que no lo declarabas todo. Multa de ${fmt(fine)}.`,'bad')}}
-  const totTax=tx+ptx;p.lastTax={inc:tx,prop:ptx};
+  const totTax=tx+ptx,taxable=Math.max(0,earn-untax);
+  p.lastTax={inc:tx,prop:ptx,sp:spTax,taxable,parts:{job:p.job?.sal||0,biz:bizT,rent,monet:p.monet?p.foll*.02:0,pension:p.pension||0},
+    items:p.jail?[]:p.assets.map(x=>({e:assetE(x),n:x.n,t:assetTax(x)})).filter(x=>x.t>=1).sort((a,b)=>b.t-a.t)};
   if(totTax>=1){cost+=totTax;L(`🧾 Impuestos: ${fmt(tx)} de renta${ptx>=1?` y ${fmt(ptx)} de propiedades`:''}.`,'money')}
   if(a>=18&&!p.jail)cost+=Math.max(0,earn-totTax)*.55;
   if(earn||cost){p.money+=earn-cost;L(`Ingresos ${fmt(earn)} · gastos ${fmt(cost)}`,'money')}
@@ -2082,7 +2085,7 @@ X.svc=(a,k)=>{const s=SERVICES.find(x=>x.k===k);if(!s)return;p.subs=p.subs||{};p
 function renderMoney(){
   if(p.age<16)return '';
   const lt=p.lastTax;
-  let h=`<h3>🧾 Impuestos</h3><p class="note">${lt?`El año pasado pagaste ${fmt(lt.inc)} de renta y ${fmt(lt.prop)} por tus propiedades.`:'Cada año pagas impuestos por lo que ganas y por tus casas y vehículos.'} Hasta ${fmt(12000*W())} de ingresos no pagas renta; después, un 20 %, un 30 % y un 42 % por tramos.${p.evade?' ⚠️ Ahora mismo no declaras la mitad: cada año puede tocarte una inspección.':''}</p>${btn('tax','evade',p.evade?'🧾 Volver a declararlo todo':'🙈 Hacer trampa con los impuestos',0,1)}`;
+  let h=`<h3>🧾 Impuestos</h3><p class="note">${lt?`El año pasado pagaste ${fmt(lt.inc)} de renta y ${fmt(lt.prop)} por tus propiedades.`:'Cada año pagas impuestos por lo que ganas y por tus casas y vehículos.'} Hasta ${fmt(12000*W())} de ingresos no pagas renta; después, un 20 %, un 30 % y un 42 % por tramos.${p.evade?' ⚠️ Ahora mismo no declaras la mitad: cada año puede tocarte una inspección.':''}</p>${taxDetail()}<div style="margin-top:8px">${btn('tax','evade',p.evade?'🧾 Volver a declararlo todo':'🙈 Hacer trampa con los impuestos',0,1)}</div>`;
   if(p.age>=18){p.subs=p.subs||{};
     h+=`<h3>🛎️ Servicios contratados</h3><p class="note">Se pagan cada año mientras los tengas.</p>`+SERVICES.map(s=>{const no=s.req&&s.req();return `<div class="row"><div><b>${s.e} ${s.n}</b><small>${fmt(s.c*W())} al año · ${s.d}</small></div>${btn('svc','toggle:'+s.k,p.subs[s.k]?'Dar de baja':'Contratar',!p.subs[s.k]&&s.req&&!s.req()||p.jail,!p.subs[s.k])}</div>`}).join('')}
   return h}
@@ -2234,6 +2237,24 @@ function bizManage(i){const b=bizInit(p.biz[i]);if(!b)return;const k=b.id,PR=[''
     ${B('grow',`📈 Ampliar (${fmt(b.v*.5)})`,p.money<b.v*.5)}
     ${B('sell',`💸 Vender por ${fmt(b.v)}`)}
     ${B('x','Cerrar',0,0)}</div>`,map)}
+
+/* ---------- lo que cuesta cada cosa al año ---------- */
+function assetTax(x){return x.k==='house'?x.v*.005:['car','moto','boat','plane'].includes(x.k)?x.v*.01:0}
+function assetYear(a){const tax=p.jail?0:assetTax(a),up=a.m||0,rent=a.rent?a.v*.045:0,rate=a.d==='art'?1.03:(a.d||DEP[a.k]||.95),dv=a.v*(rate-1);
+  return {tax,up,rent,dv,net:rent-tax-up+dv}}
+function marginal(x){const b=[12000,35000,70000].map(v=>v*W());return x>b[2]?.42:x>b[1]?.3:x>b[0]?.2:0}
+function assetLine(a){const y=assetYear(a);
+  return `<small>Vale ${fmt(a.v)} · balance anual <b class="${y.net>=0?'pos':'neg'}">${y.net>=0?'+':''}${fmt(y.net)}</b></small><small>${[y.tax>=1?`🧾 impuesto ${fmt(y.tax)}`:'',y.up>=1?`🔧 mantenimiento ${fmt(y.up)}`:'',y.rent?`🏘️ alquiler +${fmt(y.rent)}`:'',`${y.dv>=0?'📈 gana':'📉 pierde'} ${fmt(Math.abs(y.dv))} de valor`].filter(Boolean).join(' · ')}</small>`}
+function assetSummary(){let tax=0,up=0,rent=0,worst=null;
+  for(const a of p.assets){const y=assetYear(a);tax+=y.tax;up+=y.up;rent+=y.rent;if(y.net<0&&(!worst||y.net<worst.y.net))worst={a,y}}
+  return `<p class="note">Cada año tus bienes te cuestan ${fmt(tax)} en impuestos y ${fmt(up)} en mantenimiento${rent?`, y te dan ${fmt(rent)} de alquileres`:''}. El balance incluye lo que gana o pierde de valor cada cosa.${worst?` Lo que más te cuesta: ${assetE(worst.a)} ${worst.a.n.toLowerCase()} (${fmt(-worst.y.net)} al año).`:''}</p>`}
+function taxDetail(){const lt=p.lastTax;if(!lt||!lt.parts)return '';const pr=lt.parts;
+  const known=pr.job+Math.max(0,pr.biz)+pr.rent+pr.monet+pr.pension;
+  const rows=[['💼 Sueldo',pr.job],['🏢 Negocios',Math.max(0,pr.biz)],['🏘️ Alquileres',pr.rent],['💸 Redes sociales',pr.monet],['🏖️ Pensión',pr.pension],['🎭 Otros ingresos',Math.max(0,lt.taxable-known)]].filter(r=>r[1]>=1);
+  const m=marginal(lt.taxable);
+  return `<p class="eyebrow" style="margin-top:10px!important">El año pasado</p><dl class="sum">${rows.map(([n,v])=>`<dt>${n}</dt><dd>${fmt(v)}</dd>`).join('')}<dt>📊 Total que tributa</dt><dd>${fmt(lt.taxable)}</dd><dt>🧾 Renta pagada</dt><dd>${fmt(lt.inc-(lt.sp||0))}${lt.sp>=1?` (más ${fmt(lt.sp)} de tu cónyuge)`:''}</dd><dt>🏠 Impuesto de propiedades</dt><dd>${fmt(lt.prop)}</dd></dl>
+    <p class="note">Tu tramo más alto es el ${Math.round(m*100)} %: de cada ${fmt(1000)} más que ganes, ${fmt(1000*m)} se van en impuestos.</p>`
+    +(lt.items?.length?`<p class="eyebrow" style="margin-top:10px!important">Impuesto de cada propiedad</p>`+lt.items.slice(0,10).map(x=>`<div class="row"><div><b>${x.e} ${esc(x.n)}</b></div><b>${fmt(x.t)}/año</b></div>`).join(''):'')}
 
 /* ---------- gente ---------- */
 function relMenu(r){
@@ -2466,10 +2487,10 @@ function renderAssets(){
   let h=`<h3>🏦 Tus cuentas</h3><dl class="sum"><dt>💵 Dinero</dt><dd>${fmt(p.money)}</dd><dt>📉 Deudas</dt><dd>${fmt(p.debt)}</dd>${invTot>=1?`<dt>📈 Invertido</dt><dd>${fmt(invTot)}</dd>`:''}<dt>💎 Patrimonio</dt><dd>${fmt(worth())}</dd>${p.monet?`<dt>💸 Redes</dt><dd>${fmt(p.foll*.02)} al año</dd>`:''}</dl>`;
   if(p.debt>0)h+=`<div class="btns"><button class="btn small" data-pay="1000" ${p.money<1?'disabled':''}>💳 Pagar ${fmt(1000)}</button><button class="btn small" data-pay="10000" ${p.money<1?'disabled':''}>💳 Pagar ${fmt(10000)}</button><button class="btn small ghost" data-pay="all" ${p.money<1?'disabled':''}>Pagar todo lo que pueda</button></div>`;
   const upkeep=p.assets.reduce((s,a)=>s+(a.m||0),0);
-  h+=`<h3>🔑 Lo que tienes</h3>${upkeep?`<p class="note">Mantenimiento total: ${fmt(upkeep)} al año.</p>`:''}`+(p.assets.length?p.assets.map((a,i)=>`<div class="row"><div><b>${assetE(a)} ${a.n}</b><small>Vale ${fmt(a.v)}${a.m?` · mantenimiento ${fmt(a.m)}/año`:''}${a.rent?` · 🏘️ alquilada: +${fmt(a.v*.045)}/año`:''}</small></div><div class="btns">${a.k==='house'?`<button class="btn small ghost" data-rent="${i}" ${p.jail?'disabled':''}>${a.rent?'Dejar de alquilar':'Alquilar'}</button>`:''}<button class="btn small ghost" data-sell="${i}" ${p.jail?'disabled':''}>Vender</button></div></div>`).join(''):'<p class="note">Todavía no tienes nada a tu nombre.</p>');
+  h+=`<h3>🔑 Lo que tienes</h3>${p.assets.length?assetSummary():''}`+(p.assets.length?p.assets.map((a,i)=>`<div class="row"><div><b>${assetE(a)} ${a.n}</b>${assetLine(a)}</div><div class="btns">${a.k==='house'?`<button class="btn small ghost" data-rent="${i}" ${p.jail?'disabled':''}>${a.rent?'Dejar de alquilar':'Alquilar'}</button>`:''}<button class="btn small ghost" data-sell="${i}" ${p.jail?'disabled':''}>Vender</button></div></div>`).join(''):'<p class="note">Todavía no tienes nada a tu nombre.</p>');
   h+=renderMoney();
   if(p.age>=18)h+=`<h3>📜 Testamento</h3><p class="note">${willText()}</p>${btn('fam','will','Cambiar testamento',0,1)}`;
-  h+=`<h3>🏢 Tus negocios</h3>`+(p.biz.length?p.biz.map((b,i)=>{bizInit(b);return `<div class="row"><div><b>${b.e} ${b.n}</b><small>Vale ${fmt(b.v)}${b.yrs?` · último año ${b.last>=0?'+':''}${fmt(b.last)}`:' · recién abierto'} · salud ${b.hp}/100${b.hp<=30?' 🚨':''}</small></div><div class="btns"><button class="btn small" data-bx="manage:${i}" ${p.jail?'disabled':''}>⚙️ Gestionar</button></div></div>`}).join(''):'<p class="note">No tienes negocios. Móntalos desde la tienda, en 🏢 Negocios.</p>');
+  h+=`<h3>🏢 Tus negocios</h3>`+(p.biz.length?p.biz.map((b,i)=>{bizInit(b);return `<div class="row"><div><b>${b.e} ${b.n}</b><small>Vale ${fmt(b.v)}${b.yrs?` · último año ${b.last>=0?'+':''}${fmt(b.last)}`:' · recién abierto'} · salud ${b.hp}/100${b.hp<=30?' 🚨':''}${b.last>0?` · 🧾 unos ${fmt(b.last*marginal(p.lastTax?.taxable||0))} de impuestos`:''}</small></div><div class="btns"><button class="btn small" data-bx="manage:${i}" ${p.jail?'disabled':''}>⚙️ Gestionar</button></div></div>`}).join(''):'<p class="note">No tienes negocios. Móntalos desde la tienda, en 🏢 Negocios.</p>');
   h+=`<h3>📈 Inversiones</h3>`+(p.age<18?'<p class="note">Podrás invertir a partir de los 18 años.</p>':INV.filter(x=>x.k!=='crypto'||yearNow()>=2010).map(x=>{const amt=p.inv[x.k]||0,r=p.invLast?.[x.k];return `<div class="row"><div><b>${x.e} ${x.n}</b><small>${amt>=1?`${fmt(amt)} invertido`:'Nada invertido'}${r!=null&&amt>=1?` · último año ${r>=0?'+':''}${Math.round(r*100)} %`:''} · riesgo ${x.r}</small></div><button class="btn small ghost" data-inv="${x.k}" ${p.jail||!p.alive?'disabled':''}>Gestionar</button></div>`}).join(''));
   return h+renderShop();
 }
