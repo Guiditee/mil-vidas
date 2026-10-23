@@ -987,8 +987,8 @@ function ageUp(){
     if(a>=(j.late?42:35)||p.athl<30){L(`${j.e} Te retiras: se acaba tu carrera profesional en ${j.sport.toLowerCase()}.`);p.job=null}
   }else if(j){
     j.yrs++;j.perf=clamp(j.perf+R(-8,6)+(p.s.sma>70?2:0),0,100);
-    if(j.mil){inc('mil');const M=BR(j).mis;if(chance(.25))special(M[0],M[1],[
-      [M[2],()=>{if(chance(.2)){st('hea',-R(15,35));return 'Te hieren durante la misión. Vuelves con una medalla y cicatrices.'}p.job.perf=clamp(p.job.perf+15,0,100);p.karma++;return '🎖️ Cumples la misión con honores. Te condecoran.'}],
+    if(j.mil){inc('mil');milHazard(j);const M=BR(j).mis,HU=BR(j).hurt;if(chance(.25))special(M[0],M[1],[
+      [M[2],()=>{if(chance(HU[0])){st('hea',-R(15,35));return HU[1]}p.job.perf=clamp(p.job.perf+15,0,100);p.karma++;return '🎖️ Cumples la misión con honores. Te condecoran.'}],
       [M[3],()=>{p.job.perf=clamp(p.job.perf-5,0,100);return M[4]}]],()=>!!p.job?.mil)}
     if(j.music&&chance(.3)){
       if(chance((p.s.sma+p.s.loo)/260)){const f=R(10000,500000),m=R(5000,80000)*W();p.foll+=f;p.money+=m;grant('hit');st('hap',15);L(`🎤 ¡Tu nuevo single arrasa! ${cfmt(f)} seguidores nuevos y ${fmt(m)} en derechos.`,'good')}
@@ -1320,20 +1320,38 @@ const BRANCHES={
   tierra:{n:'Ejército de Tierra',art:'el',e:'🪖',sal:20000,d:'Misiones en tierra y despliegues en el extranjero',
     ranks:['Soldado','Cabo','Sargento','Teniente','Capitán','Comandante','Coronel','General'],
     mis:['🪖 Misión en el extranjero','Tu unidad recibe órdenes de partir a una misión de paz.','Ir en primera línea','Pedir un puesto en la base','Pasas la misión organizando suministros.'],
-    die:['una emboscada durante una misión en el extranjero','Murió en acto de servicio.']},
+    die:['una emboscada durante una misión en el extranjero','Murió en acto de servicio.'],death:.0025,hurt:[.2,'Te hiere la metralla durante la misión. Vuelves con una medalla y cicatrices.'],
+    rk:'minas, combates, lesiones en maniobras y estrés postraumático',
+    haz:[.15,[['🪖 Pisas una mina en unas maniobras. Te salvas, pero con metralla en la pierna.',()=>st('hea',-R(10,25))],
+      ['🪖 Un compañero cae en combate a tu lado. Te persiguen las pesadillas.',()=>{addStress(R(10,20));st('hap',-8)}],
+      ['🪖 Te rompes el tobillo en una marcha de 40 kilómetros.',()=>st('hea',-R(5,12))],
+      ['🪖 Te diagnostican estrés postraumático tras un despliegue.',()=>addStress(R(15,25))]]]},
   armada:{n:'Armada',art:'la',e:'⚓',sal:21000,d:'Vida en alta mar, barcos y submarinos',
     ranks:['Marinero','Cabo','Sargento','Alférez de navío','Teniente de navío','Capitán de corbeta','Capitán de navío','Almirante'],
     mis:['⚓ Misión en alta mar','Tu barco zarpa para vigilar una zona llena de piratas.','Subir al abordaje','Quedarme en la sala de máquinas','Pasas la misión entre motores y aceite.'],
-    die:['el hundimiento de su barco durante una tormenta','Murió en acto de servicio, en alta mar.']},
+    die:['el hundimiento de su barco durante una tormenta','Murió en acto de servicio, en alta mar.'],death:.002,hurt:[.15,'Durante el abordaje te dan un golpe con un remo y caes contra la cubierta.'],
+    rk:'caídas por la borda, incendios a bordo, largas ausencias de casa y pérdida de oído',
+    haz:[.15,[['⚓ Una ola gigante te tira por la borda. Te rescatan helado de frío.',()=>st('hea',-R(8,20))],
+      ['⚓ Pasas ocho meses embarcado. Tu familia te echa mucho de menos.',()=>{p.rels.filter(r=>r.alive&&['spouse','partner','child'].includes(r.role)).forEach(r=>r.bond=clamp(r.bond-8,0,100));st('hap',-4)}],
+      ['⚓ Un incendio en la sala de máquinas te deja quemaduras en los brazos.',()=>st('hea',-R(10,20))],
+      ['⚓ Tantos años junto a los motores te dejan algo sordo.',()=>st('hea',-R(3,6))]]]},
   aire:{n:'Ejército del Aire',art:'el',e:'✈️',sal:23000,sma:60,d:'Pilotos y aviones de combate; pide inteligencia 60',
     ranks:['Soldado','Cabo','Sargento','Teniente','Capitán','Comandante','Coronel','General del Aire'],
     mis:['✈️ Misión aérea','Te asignan a una misión de vigilancia del espacio aéreo.','Pilotar en vuelo rasante','Quedarme en la torre de control','Pasas la misión guiando a otros pilotos desde tierra.'],
-    die:['un accidente de su caza durante un entrenamiento','Murió en acto de servicio, a los mandos de su avión.']}};
+    die:['un accidente de su caza durante un entrenamiento','Murió en acto de servicio, a los mandos de su avión.'],death:.0035,hurt:[.25,'Un misil impacta cerca de tu avión. Aterrizas de milagro, con heridas.'],
+    rk:'eyecciones, aterrizajes forzosos, desmayos en vuelo y el mayor riesgo de accidente mortal; con menos de 50 de salud no te dejan volar',
+    haz:[.12,[['✈️ Tienes que eyectarte de tu avión en un entrenamiento. Te lesionas la espalda.',()=>st('hea',-R(12,28))],
+      ['✈️ Pierdes el conocimiento un instante en un giro muy cerrado. Te retiran del vuelo una temporada.',()=>{st('hea',-R(3,8));if(p.job)p.job.perf=clamp(p.job.perf-10,0,100)}],
+      ['✈️ Aterrizaje forzoso de emergencia. Sales con unos cuantos golpes.',()=>st('hea',-R(5,15))],
+      ['✈️ La presión de las misiones te pasa factura.',()=>addStress(R(8,15))]]]}};
+function milHazard(j){const B=BR(j);
+  if(j.br==='aire'&&p.s.hea<50){j.perf=clamp(j.perf-10,0,100);L('✈️ Con tu salud actual no te dejan volar. Te toca trabajo de oficina.','bad');return}
+  if(chance(B.haz[0])){const [t,fx]=pick(B.haz[1]);fx();L(t,'bad')}}
 const BR=j=>BRANCHES[j?.br]||BRANCHES.tierra;
 function rankMil(l,k){const r=(BRANCHES[k]||BRANCHES.tierra).ranks[Math.min(l,7)];return p.sex==='F'&&r==='Marinero'?'Marinera':r}
 function branchPick(){const map={};
   Object.entries(BRANCHES).forEach(([k,B])=>map[k]=()=>done(enlist(k)));
-  openModal(`<p class="eyebrow">🎖️ Fuerzas Armadas</p><h2>¿Dónde te alistas?</h2><p class="muted">Sueldo fijo, ascensos por rangos y misiones. Hace falta salud 50 y no tener antecedentes.</p><div class="choices">${Object.entries(BRANCHES).map(([k,B])=>`<button class="btn ghost" data-k="${k}" ${B.sma&&p.s.sma<B.sma?'disabled':''}>${B.e} ${B.n} · ${fmt(B.sal*W())} al año · ${B.d}</button>`).join('')}</div>`,map)}
+  openModal(`<p class="eyebrow">🎖️ Fuerzas Armadas</p><h2>¿Dónde te alistas?</h2><p class="muted">Sueldo fijo, ascensos por rangos y misiones. Hace falta salud 50 y no tener antecedentes.</p><div class="choices">${Object.entries(BRANCHES).map(([k,B])=>`<button class="btn ghost" data-k="${k}" ${B.sma&&p.s.sma<B.sma?'disabled':''}>${B.e} ${B.n} · ${fmt(B.sal*W())} al año · ${B.d}. Riesgos: ${B.rk}</button>`).join('')}</div>`,map)}
 function enlist(k='tierra'){const B=BRANCHES[k]||BRANCHES.tierra;
   if(p.s.hea<50)return 'No pasas el reconocimiento médico. Necesitas más salud.';
   if(p.record>0)return 'Con antecedentes penales no te aceptan en el ejército.';
@@ -2330,7 +2348,7 @@ const RISKY={'Policía':[.003,'un tiroteo durante una persecución policial'],'B
   'Electricista':[.002,'una descarga eléctrica mientras trabajaba'],'Mecánico':[.0015,'un coche que se le cayó encima en el taller'],
   'Repartidor':[.002,'un accidente con la moto de reparto'],'Piloto de avión':[.002,'un accidente de avión'],'Cocinero':[.0005,'un incendio en la cocina del restaurante']};
 function jobRisk(){const j=p.job;if(!j||p.jail)return null;
-  if(j.mil)return [.004,BR(j).die[0],BR(j).die[1]];
+  if(j.mil)return [BR(j).death,BR(j).die[0],BR(j).die[1]];
   if(j.agent)return [.004,'una misión secreta que salió mal','Su familia nunca supo los detalles.'];
   if(j.astro)return [.002,'un fallo en la nave durante una misión espacial','Su nombre quedó grabado en la historia.'];
   if(j.sport==='Automovilismo'||j.sport==='Motociclismo')return [.005,`un accidente en plena carrera de ${j.sport.toLowerCase()}`,'Ocurrió en una curva a más de 250 km/h.'];
@@ -2561,7 +2579,7 @@ function renderCareer(){
   }
   h+='<h3>💼 Trabajo</h3>';
   if(p.job){const j=p.job;
-    h+=`<div class="row"><div><b>${j.e||'💼'} ${jt(j)}</b><small>${fmt(j.sal)} al año${j.pt?' · media jornada':''}</small></div></div>${j.sport?bar('⚽ Forma física',p.athl):bar('Rendimiento',j.perf)}
+    h+=`<div class="row"><div><b>${j.e||'💼'} ${jt(j)}</b><small>${fmt(j.sal)} al año${j.pt?' · media jornada':''}</small></div></div>${j.mil?`<p class="note">${BR(j).e} Riesgos de ${BR(j).art} ${BR(j).n}: ${BR(j).rk}.</p>`:''}${j.sport?bar('⚽ Forma física',p.athl):bar('Rendimiento',j.perf)}
     <div class="btns" style="margin-top:10px">${j.sport?'':`<button class="btn small" data-job="hard" ${full('hard')?'disabled':''}>Trabajar más duro${left('hard')}</button>`}${j.sport||j.mil?'':`<button class="btn small ghost" data-job="raise" ${full('raise')?'disabled':''}>Pedir un aumento</button>`}${p.age>=60&&!j.pt&&!j.sport?'<button class="btn small ghost" data-job="retire">Jubilarme</button>':''}<button class="btn small ghost" data-job="quit">${j.mil?'Pedir la baja':j.sport?'Retirarme':'Dejar el trabajo'}</button></div>`;
   }else if(p.retired)h+=`<p class="muted">🏖️ ${g('Jubilado','Jubilada')}. Cobras ${fmt(p.pension)} al año.</p>`;
   else if(p.age<14)h+=`<p class="muted">Eres demasiado ${g('pequeño','pequeña')} para trabajar. Desde los 14 puedes buscar trabajillos.</p>`;
