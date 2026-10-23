@@ -2368,6 +2368,8 @@ function newLifeForm(){
   openModal(`<p class="eyebrow">Sin anuncios · sin compras · todo desbloqueado</p><h2>👶 Nueva vida</h2>
   <form class="form" id="nl-form">
     <label for="nl-name">Nombre<input id="nl-name" placeholder="Al azar" maxlength="20" autocomplete="off"></label>
+    <label for="nl-l1">Primer apellido<input id="nl-l1" placeholder="Al azar" maxlength="20" autocomplete="off"></label>
+    <label for="nl-l2">Segundo apellido<input id="nl-l2" placeholder="Al azar" maxlength="20" autocomplete="off"></label>
     <label for="nl-sex">Sexo<select id="nl-sex">${opt('','Al azar')}${opt('F','Mujer')}${opt('M','Hombre')}</select></label>
     <label for="nl-c">País<select id="nl-c">${opt('','Al azar')}${COUNTRIES.map((c,i)=>[i,c.n]).sort((a,b)=>a[1].localeCompare(b[1],'es')).map(([i,n])=>opt(i,n)).join('')}</select></label>
     <label for="nl-pref">Te atraen<select id="nl-pref">${opt('','Lo habitual según tu sexo')}${opt('F','Las mujeres')}${opt('M','Los hombres')}${opt('A','Ambos')}</select></label>
@@ -2379,7 +2381,7 @@ function newLifeForm(){
   </form>`,{cancel:closeModal},!!(p&&p.alive));
   $('#nl-form').addEventListener('submit',e=>{e.preventDefault();
     const c=$('#nl-c').value;
-    const tr=[$('#nl-t1').value,$('#nl-t2').value].filter(Boolean);newLife({first:cleanName($('#nl-name').value)||undefined,sex:$('#nl-sex').value||undefined,c:c===''?undefined:+c,pref:$('#nl-pref').value||undefined,born:$('#nl-y').value===''?undefined:+$('#nl-y').value,traits:tr.length?[...tr,...rollTraits().filter(k=>!tr.includes(k))].slice(0,Math.max(2,tr.length)):undefined});});
+    const tr=[$('#nl-t1').value,$('#nl-t2').value].filter(Boolean);const sur=id=>cleanName($(id).value).replace(/\s+/g,'\u00a0'),l1=sur('#nl-l1'),l2=sur('#nl-l2');newLife({first:cleanName($('#nl-name').value)||undefined,last:l1||l2?`${l1||pick(SUR)} ${l2||pick(SUR)}`:undefined,sex:$('#nl-sex').value||undefined,c:c===''?undefined:+c,pref:$('#nl-pref').value||undefined,born:$('#nl-y').value===''?undefined:+$('#nl-y').value,traits:tr.length?[...tr,...rollTraits().filter(k=>!tr.includes(k))].slice(0,Math.max(2,tr.length)):undefined});});
 }
 function freeMode(){
   const names={hap:'😊 Felicidad',hea:'❤️ Salud',sma:'🧠 Inteligencia',loo:'✨ Aspecto'};
