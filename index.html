@@ -377,7 +377,7 @@ function pay(v){if(p.money>=v){p.money-=v;return true}return false}
 function used(k){return p.used[k]||0}
 function use(k){p.used[k]=used(k)+1}
 const PER_YEAR=5;
-const LIMITS={acast:3,ptour:1,mbrand:1,cdonate:2,msmug:2,mcasino:2,pbribe:1};
+const LIMITS={raise:1,acast:3,ptour:1,mbrand:1,cdonate:2,msmug:2,mcasino:2,pbribe:1};
 const full=k=>used(k)>=(LIMITS[k]||PER_YEAR);
 const left=k=>used(k)?` (quedan ${PER_YEAR-used(k)})`:'';
 const inc=k=>{p.cnt[k]=(p.cnt[k]||0)+1};
@@ -916,7 +916,8 @@ function runQueue(){
 function special(title,txt,ch,cond){queue.push({title,_t:txt,ch,cond})}
 function enroll(m,t='pub'){p.uni={m:m.n,left:m.y,type:t};if(p.job&&!p.job.pt)p.job=null;return `${MAJOR_E[m.n]||'🎓'} Te matriculas en ${m.n}. Te esperan ${m.y} años de estudio.`}
 function retire(){p.pension=p.job.sal*.6;p.job=null;p.retired=true;st('hap',10);return `🏖️ Te jubilas. Cobrarás ${fmt(p.pension)} al año.`}
-function hire(j,extra={}){p.job={t:j.t,e:j.e,sal:j.sal*W()*(.9+Math.random()*.2)*(p.undoc?.7:1)*(speaks(langOf(p.c))?1:.8)*(j.major&&j.major===p.major?UT(p.uniType).mult:1),perf:60,yrs:0,pt:!!j.pt,lvl:0,fam:!!j.fam,music:!!j.music,...extra};p.everJob=true;st('hap',6)}
+function jobCap(j){const known={Agente:50000,Astronauta:80000,Soldado:20000};const b=j.base??JOBS.find(x=>x.t[0]===j.t[0])?.sal??known[j.t[0].split(' ')[0]]??j.sal/W();return b*W()*3}
+function hire(j,extra={}){p.job={base:j.sal,t:j.t,e:j.e,sal:j.sal*W()*(.9+Math.random()*.2)*(p.undoc?.7:1)*(speaks(langOf(p.c))?1:.8)*(j.major&&j.major===p.major?UT(p.uniType).mult:1),perf:60,yrs:0,pt:!!j.pt,lvl:0,fam:!!j.fam,music:!!j.music,...extra};p.everJob=true;st('hap',6)}
 
 /* ---------- pasar el año ---------- */
 function ageUp(){
@@ -2547,7 +2548,7 @@ $('#panel').addEventListener('click',e=>{
     return done(`No te cogen para ${j.t[p.sex==='F'?1:0].toLowerCase()}. Prueba otra vez.`)}
   if(d.job){const j=p.job;
     if(d.job==='hard'){use('hard');j.perf=clamp(j.perf+R(6,14)/(has('lazy')?2:1),0,100);addStress(R(3,7));st('hap',-R(1,4));return done('💪 Te dejas la piel en el trabajo. Tus jefes lo notan.')}
-    if(d.job==='raise'){use('raise');if(chance(j.perf/140)){j.sal*=1.08;return done(`📈 Te suben el sueldo a ${fmt(j.sal)} al año.`)}j.perf=clamp(j.perf-5,0,100);return done('Tu jefe se ríe y te dice que vuelvas el año que viene.')}
+    if(d.job==='raise'){use('raise');if(j.sal>=jobCap(j))return done(`📈 Ya cobras el máximo para tu puesto (${fmt(jobCap(j))} al año). Para ganar más, busca un trabajo mejor.`);if(chance(j.perf/140)){j.sal=Math.min(jobCap(j),j.sal*1.08);return done(`📈 Te suben el sueldo a ${fmt(j.sal)} al año.`)}j.perf=clamp(j.perf-5,0,100);return done('Tu jefe se ríe y te dice que vuelvas el año que viene.')}
     if(d.job==='retire')return done(retire());
     if(d.job==='quit'){const t=jt(j).toLowerCase();p.job=null;st('hap',3);return done(`Dejas tu puesto de ${t}.`)}}
   if(d.edu){
