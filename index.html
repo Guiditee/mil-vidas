@@ -824,6 +824,24 @@ const EVENTS=[
   ['Soltarme y correr',()=>chance(.6)?'Te sueltas y corres hasta una calle con gente.':(st('hea',-R(5,12)),'Forcejeas y te haces daño en la muñeca.')],
   [maOpt('Defenderme'),()=>fight(.05)?(inc('defend'),st('hap',6),'🥋 Te liberas con una técnica que has practicado mil veces. Huye asustado.'):(st('hea',-R(8,18)),'Te defiendes como puedes y consigues escapar, con algún golpe.')],
   ['Gritar con todas mis fuerzas',()=>chance(.6)?'Se asusta y desaparece.':'Sigue tirando de ti hasta que pasa un coche y huye.']]},
+ // negocios
+ {w:.5,min:18,max:120,cond:()=>p.biz.length>0,txt:()=>{EVB=pick(p.biz);return `Un cliente famoso recomienda tu negocio (${EVB.n.toLowerCase()}) en sus redes.`},ch:[
+  ['Darle las gracias en público',evb(b=>{b.mk=clamp(b.mk+25,0,100);b.hp=clamp(b.hp+10,0,100);return 'Se llena de clientes nuevos.'})],
+  ['Ofrecerle un descuento para siempre',evb(b=>{b.mk=clamp(b.mk+15,0,100);b.q=clamp(b.q+5,0,100);return 'Vuelve cada semana con sus amigos.'})]]},
+ {w:.5,min:18,max:120,cond:()=>p.biz.length>0,txt:()=>{EVB=pick(p.biz);return `Llega una inspección a tu negocio (${EVB.n.toLowerCase()}).`},ch:[
+  ['Ponerlo todo en regla',evb(b=>{const c=b.v*.01;if(!pay(c))p.debt+=c;return `Pagas ${fmt(c)} en pequeños arreglos y pasas la inspección.`})],
+  ['Ofrecer un sobre al inspector',evb(b=>{p.karma-=3;if(chance(.25)){p.record++;const f=b.v*.1;p.debt+=f;return `El inspector no se deja sobornar. Multa de ${fmt(f)} y antecedentes.`}return 'El inspector se guarda el sobre y firma sin mirar.'})],
+  ['Cruzar los dedos',evb(b=>{if(chance(.5))return 'Por suerte, todo está en orden.';b.hp=clamp(b.hp-20,0,100);return 'Encuentran irregularidades y te cierran unas semanas.'})]]},
+ {w:.5,min:18,max:120,cond:()=>p.biz.length>0,txt:()=>{EVB=pick(p.biz);return `El mejor empleado de tu negocio (${EVB.n.toLowerCase()}) quiere irse a la competencia.`},ch:[
+  ['Subirle el sueldo',evb(b=>{const c=b.v*.02;if(!pay(c))p.debt+=c;return `Se queda. Te cuesta ${fmt(c)}.`})],
+  ['Dejarle ir',evb(b=>{b.q=clamp(b.q-12,0,100);return 'Se va, y se nota en el servicio.'})]]},
+ {w:.5,min:18,max:120,cond:()=>p.biz.length>0,txt:()=>{EVB=pick(p.biz);return `Una gran cadena abre justo al lado de tu negocio (${EVB.n.toLowerCase()}).`},ch:[
+  ['Bajar los precios',evb(b=>{b.pr=1;return 'Pones precios bajos para no perder clientes.'})],
+  ['Mejorar la calidad',evb(b=>{const c=b.v*.05;if(!pay(c))p.debt+=c;b.q=clamp(b.q+15,0,100);return `Inviertes ${fmt(c)} en ser mejor que ellos.`})],
+  ['No hacer nada',evb(b=>{b.hp=clamp(b.hp-15,0,100);b.mk=Math.max(0,b.mk-15);return 'Pierdes muchos clientes.'})]]},
+ {w:.4,min:18,max:120,cond:()=>p.biz.length>0,txt:()=>{EVB=pick(p.biz);EVB.offer=Math.round(EVB.v*(1.3+Math.random()*.5));return `Un inversor te ofrece ${fmt(EVB.offer)} por tu negocio (${EVB.n.toLowerCase()}).`},ch:[
+  ['Venderlo',evb(b=>{p.biz.splice(p.biz.indexOf(b),1);p.money+=b.offer;return `Vendes por ${fmt(b.offer)}. ¡Buen negocio!`})],
+  ['Rechazar la oferta',()=>'Le dices que no está en venta.']]},
  // caseros
  {min:18,max:120,cond:()=>p.assets.some(a=>a.rent),txt:()=>'Uno de tus inquilinos lleva meses sin pagar el alquiler.',ch:[
   ['Negociar un plan de pagos',()=>chance(.6)?'Acepta y empieza a pagar poco a poco.':'Promete pagar… y vuelve a no hacerlo.'],
@@ -988,12 +1006,7 @@ function ageUp(){
   cost+=p.assets.reduce((s,x)=>s+(x.m||0),0);
   const rent=p.assets.filter(x=>x.rent).reduce((s,x)=>s+x.v*.045,0);earn+=rent;
   let bizT=0;
-  for(const b of p.biz){b.yrs=(b.yrs||0)+1;
-    if(b.su){const r=Math.random();if(r<.08){b.v*=R(5,20);b.last=0;L(`🚀 ¡Tu startup se dispara! Ahora vale ${fmt(b.v)}.`,'good')}else if(r<.2){b.dead=true;L('💥 Tu startup se queda sin dinero y cierra.','bad');continue}else b.last=-b.v*.08}
-    else{b.last=b.v*b.rate*.6*(1+(Math.random()*2-1)*b.risk*1.6)*(has('business')?1.3:1);b.v*=.97+Math.random()*.1;
-      if(chance(b.risk>=.5?.04:.015)){b.dead=true;L(`💥 Tu negocio (${b.n.toLowerCase()}) quiebra y tienes que cerrarlo.`,'bad');continue}}
-    bizT+=b.last;
-  }
+  for(const b of p.biz){bizYear(b);if(!b.dead)bizT+=b.last}
   p.biz=p.biz.filter(b=>!b.dead);earn+=bizT;
   if(p.biz.length)L(`🏢 Tus negocios ${bizT>=0?'ganan':'pierden'} ${fmt(Math.abs(bizT))} este año.`,bizT>=0?'good':'bad');
   if(rent)L(`🏘️ Cobras ${fmt(rent)} de alquileres.`,'money');
@@ -2172,6 +2185,56 @@ function kidUniPick(r){const map={};
   MAJORS.forEach((m,i)=>map['m'+i]=()=>uniTypePick(m.n,m.y,kidSma(r),`🎓 Universidad de ${r.first}`,t=>done(kidEnroll(r,t,m.n))));
   openModal(`<p class="eyebrow">🎓 Universidad de ${r.first}</p><h2>¿Qué estudia?</h2><p class="muted">${r.want?`Su sueño es estudiar ${r.want.toLowerCase()}. Si le obligas a otra cosa, os llevaréis peor.`:'Todavía no sabe qué quiere estudiar.'}</p><div class="choices">${MAJORS.map((m,i)=>`<button class="btn ghost" data-k="m${i}">${MAJOR_E[m.n]} ${m.n} · ${m.y} años${r.want===m.n?' · ⭐ lo que quiere':''}</button>`).join('')}</div>`,map)}
 
+/* ---------- gestión de negocios ---------- */
+let EVB=null;
+function bizInit(b){if(!b)return b;b.id=b.id||uid();b.q??=50;b.mk??=30;b.pr??=2;b.st??=2;b.mg??=false;b.hp??=70;return b}
+function evb(f){return ()=>p.biz.includes(EVB)?f(bizInit(EVB)):'Ya no tienes ese negocio.'}
+function bizYear(b){bizInit(b);b.yrs=(b.yrs||0)+1;const mgr=b.mg?b.v*.03:0;
+  if(b.su){if(chance(.08*(1+b.q/100))){b.v*=R(5,20);b.last=-mgr;b.hp=Math.min(100,b.hp+30);b.su=false;b.rate=.15;b.risk=.3;b.n='Empresa tecnológica';L(`🚀 ¡Tu startup se dispara y se convierte en una empresa tecnológica de verdad! Ahora vale ${fmt(b.v)}.`,'good')}
+    else{b.last=-b.v*.08-mgr;b.hp=clamp(b.hp-R(8,18)*(b.mg?.7:1),0,100)}}
+  else{const dem=(.6+b.q/125)*(.75+b.mk/200)*[0,1.25,1,.75][b.pr]*[0,.8,1,1.15][b.st],mar=[0,.7,1,1.35][b.pr];
+    b.last=b.v*b.rate*.6*dem*mar*(1+(Math.random()*2-1)*b.risk*1.6)*(has('business')?1.3:1)-b.v*[0,-.02,0,.03][b.st]-mgr;
+    b.v*=.97+Math.random()*.06+(b.q-50)/2000;
+    b.hp=clamp(b.hp+(b.last>=0?R(4,10):-R(10,22)),0,100)}
+  b.mk=Math.max(0,b.mk-R(5,12));
+  if(!b.mg&&!b.worked)b.q=Math.max(0,b.q-R(2,5));b.worked=false;
+  if(b.hp<=0){b.dead=true;L(`💥 ${b.e} Tu negocio (${b.n.toLowerCase()}) lleva demasiado tiempo en pérdidas y cierra.`,'bad');return}
+  if(b.hp<=30)L(`🚨 ${b.e} Tu negocio (${b.n.toLowerCase()}) está en apuros (salud ${b.hp}/100). Gestiónalo en 🏠 Bienes o podría cerrar.`,'bad');
+}
+function bizManage(i){const b=bizInit(p.biz[i]);if(!b)return;const k=b.id,PR=['','baratos','normales','caros'],ST=['','pocos','normales','muchos'];
+  const cost=(f,t,go)=>()=>{const c=b.v*f;if(!pay(c))return result(`${t} cuesta ${fmt(c)}.`);go(c)};
+  const re=t=>{toast(t);save();render();bizManage(i)};
+  const map={
+    work:()=>{use('bw'+k);b.worked=true;b.q=clamp(b.q+R(3,8),0,100);b.hp=clamp(b.hp+R(2,6),0,100);addStress(R(3,6));done(`${b.e} Echas muchas horas en tu negocio. Calidad ${b.q}/100.`)},
+    mkt:cost(.03,'La campaña',()=>{use('bm'+k);b.mk=clamp(b.mk+R(15,30),0,100);done(`📣 Lanzas una campaña de publicidad. Marketing ${b.mk}/100.`)}),
+    train:cost(.02,'La formación',()=>{use('bt'+k);b.q=clamp(b.q+R(5,12),0,100);done(`🎓 Formas a tu equipo. Calidad ${b.q}/100.`)}),
+    renov:cost(.1,'La reforma',()=>{use('br'+k);b.q=clamp(b.q+R(10,20),0,100);b.v*=1.05;done(`🛠️ Reformas el local. Calidad ${b.q}/100 y ahora vale ${fmt(b.v)}.`)}),
+    rescue:cost(.1,'Inyectar dinero',c=>{b.hp=clamp(b.hp+R(25,40),0,100);done(`💵 Inyectas ${fmt(c)} en tu negocio. Salud ${b.hp}/100.`)}),
+    grow:cost(.5,'Ampliarlo',()=>{b.v*=1.5;done(`📈 Amplías tu negocio. Ahora vale ${fmt(b.v)}.`)}),
+    staff:()=>{b.st=b.st%3+1;re(`👥 Plantilla: ${ST[b.st]}`)},
+    price:()=>{b.pr=b.pr%3+1;re(`💰 Precios ${PR[b.pr]}`)},
+    mgr:()=>{b.mg=!b.mg;re(b.mg?'🧑‍💼 Contratas a un gerente':'🧑‍💼 Despides al gerente')},
+    sell:()=>{p.biz.splice(i,1);p.money+=b.v;done(`${b.e} Vendes tu negocio (${b.n.toLowerCase()}) por ${fmt(b.v)}.`)},
+    x:closeModal};
+  const B=(key,label,dis,ghost=1)=>`<button class="btn ${ghost?'ghost':''}" data-k="${key}" ${dis?'disabled':''}>${label}</button>`;
+  openModal(`<p class="eyebrow">⚙️ Gestionar negocio</p><h2>${b.e} ${b.n}</h2>
+    <dl class="sum"><dt>💎 Valor</dt><dd>${fmt(b.v)}</dd><dt>📊 Último año</dt><dd>${b.yrs?`${b.last>=0?'+':''}${fmt(b.last)}`:'recién abierto'}</dd>
+    <dt>❤️ Salud</dt><dd>${b.hp}/100${b.hp<=30?' · 🚨 en apuros':''}</dd><dt>⭐ Calidad</dt><dd>${b.q}/100</dd><dt>📣 Marketing</dt><dd>${b.mk}/100</dd>
+    <dt>👥 Plantilla</dt><dd>${ST[b.st]}</dd><dt>💰 Precios</dt><dd>${PR[b.pr]}</dd><dt>🧑‍💼 Gerente</dt><dd>${b.mg?`sí (${fmt(b.v*.03)} al año)`:'no'}</dd></dl>
+    <p class="note">La calidad y el marketing atraen clientes. Precios baratos: más clientes y menos margen; caros: al revés. Más plantilla vende más, pero cuesta más. Sin gerente, la calidad baja cada año si no trabajas tú en el negocio. Solo cierra si la salud llega a 0, y te avisamos antes.</p>
+    <div class="choices">
+    ${B('work','🧑‍💼 Trabajar en el negocio (gratis, más estrés)',full('bw'+k),0)}
+    ${B('mkt',`📣 Campaña de marketing (${fmt(b.v*.03)})`,full('bm'+k)||p.money<b.v*.03)}
+    ${B('train',`🎓 Formar al personal (${fmt(b.v*.02)})`,full('bt'+k)||p.money<b.v*.02)}
+    ${B('renov',`🛠️ Reformar el local (${fmt(b.v*.1)})`,full('br'+k)||p.money<b.v*.1)}
+    ${B('staff',`👥 Cambiar plantilla (ahora: ${ST[b.st]})`)}
+    ${B('price',`💰 Cambiar precios (ahora: ${PR[b.pr]})`)}
+    ${B('mgr',b.mg?'🧑‍💼 Despedir al gerente':`🧑‍💼 Contratar un gerente (${fmt(b.v*.03)} al año)`)}
+    ${B('rescue',`💵 Inyectar dinero (${fmt(b.v*.1)}): +salud`,p.money<b.v*.1)}
+    ${B('grow',`📈 Ampliar (${fmt(b.v*.5)})`,p.money<b.v*.5)}
+    ${B('sell',`💸 Vender por ${fmt(b.v)}`)}
+    ${B('x','Cerrar',0,0)}</div>`,map)}
+
 /* ---------- gente ---------- */
 function relMenu(r){
   if(!r.alive)return result(`🕊️ ${r.first} falleció a los ${r.age} años. Le echas de menos.`);
@@ -2406,14 +2469,14 @@ function renderAssets(){
   h+=`<h3>🔑 Lo que tienes</h3>${upkeep?`<p class="note">Mantenimiento total: ${fmt(upkeep)} al año.</p>`:''}`+(p.assets.length?p.assets.map((a,i)=>`<div class="row"><div><b>${assetE(a)} ${a.n}</b><small>Vale ${fmt(a.v)}${a.m?` · mantenimiento ${fmt(a.m)}/año`:''}${a.rent?` · 🏘️ alquilada: +${fmt(a.v*.045)}/año`:''}</small></div><div class="btns">${a.k==='house'?`<button class="btn small ghost" data-rent="${i}" ${p.jail?'disabled':''}>${a.rent?'Dejar de alquilar':'Alquilar'}</button>`:''}<button class="btn small ghost" data-sell="${i}" ${p.jail?'disabled':''}>Vender</button></div></div>`).join(''):'<p class="note">Todavía no tienes nada a tu nombre.</p>');
   h+=renderMoney();
   if(p.age>=18)h+=`<h3>📜 Testamento</h3><p class="note">${willText()}</p>${btn('fam','will','Cambiar testamento',0,1)}`;
-  h+=`<h3>🏢 Tus negocios</h3>`+(p.biz.length?p.biz.map((b,i)=>`<div class="row"><div><b>${b.e} ${b.n}</b><small>Vale ${fmt(b.v)}${b.yrs?` · último año ${b.last>=0?'+':''}${fmt(b.last)}`:' · recién abierto'}</small></div><div class="btns"><button class="btn small ghost" data-bx="grow:${i}" ${p.money<b.v*.5||p.jail?'disabled':''}>Ampliar (${fmt(b.v*.5)})</button><button class="btn small ghost" data-bx="sell:${i}" ${p.jail?'disabled':''}>Vender</button></div></div>`).join(''):'<p class="note">No tienes negocios. Móntalos desde la tienda, en 🏢 Negocios.</p>');
+  h+=`<h3>🏢 Tus negocios</h3>`+(p.biz.length?p.biz.map((b,i)=>{bizInit(b);return `<div class="row"><div><b>${b.e} ${b.n}</b><small>Vale ${fmt(b.v)}${b.yrs?` · último año ${b.last>=0?'+':''}${fmt(b.last)}`:' · recién abierto'} · salud ${b.hp}/100${b.hp<=30?' 🚨':''}</small></div><div class="btns"><button class="btn small" data-bx="manage:${i}" ${p.jail?'disabled':''}>⚙️ Gestionar</button></div></div>`}).join(''):'<p class="note">No tienes negocios. Móntalos desde la tienda, en 🏢 Negocios.</p>');
   h+=`<h3>📈 Inversiones</h3>`+(p.age<18?'<p class="note">Podrás invertir a partir de los 18 años.</p>':INV.filter(x=>x.k!=='crypto'||yearNow()>=2010).map(x=>{const amt=p.inv[x.k]||0,r=p.invLast?.[x.k];return `<div class="row"><div><b>${x.e} ${x.n}</b><small>${amt>=1?`${fmt(amt)} invertido`:'Nada invertido'}${r!=null&&amt>=1?` · último año ${r>=0?'+':''}${Math.round(r*100)} %`:''} · riesgo ${x.r}</small></div><button class="btn small ghost" data-inv="${x.k}" ${p.jail||!p.alive?'disabled':''}>Gestionar</button></div>`}).join(''));
   return h+renderShop();
 }
 function buy(ref,mort){
   const [ci,ii]=ref.split(':').map(Number),cat=SHOPCATS[ci],it=cat.items[ii];
   if(mort){if(!pay(it.v*.2))return;p.debt+=it.v*.8}else if(!pay(it.v))return result(`No tienes ${fmt(it.v)}.`);
-  if(cat.biz){p.biz.push({e:it.e,n:it.n,v:it.v,rate:it.rate,risk:it.risk,su:!!it.su,last:0,yrs:0});st('hap',5);return done(`${it.e} Abres tu negocio: ${it.n.toLowerCase()}. ¡A ver si da dinero!`)}
+  if(cat.biz){p.biz.push(bizInit({e:it.e,n:it.n,v:it.v,rate:it.rate,risk:it.risk,su:!!it.su,last:0,yrs:0}));st('hap',5);return done(`${it.e} Abres tu negocio: ${it.n.toLowerCase()}. ¡A ver si da dinero!`)}
   if(cat.once){if(it.risk&&chance(it.risk)){st('hea',-R(15,35));st('hap',-5);return done(`${it.e} ${it.fail}`)}
     st('hap',it.h);if(it.loo)st('loo',it.loo);if(it.ach)grant(it.ach);return done(`${it.e} ${it.msg}`)}
   p.assets.push({k:cat.k,e:it.e,n:it.n,v:it.v,m:it.m||0,h:it.h||0,hea:it.hea||0,loo:it.loo||0,sma:it.sma||0,d:it.d});
@@ -2480,6 +2543,7 @@ $('#panel').addEventListener('click',e=>{
   if(d.rent){const a=p.assets[+d.rent];a.rent=!a.rent;return done(a.rent?`🏘️ Pones en alquiler: ${a.n.toLowerCase()}. Cobrarás ${fmt(a.v*.045)} al año.`:`Dejas de alquilar: ${a.n.toLowerCase()}.`)}
   if(d.pay){const x=Math.min(p.money,p.debt,d.pay==='all'?Infinity:+d.pay);p.money-=x;p.debt-=x;if(p.debt<1)p.debt=0;return done(`💳 Pagas ${fmt(x)} de deuda.${p.debt?` Te quedan ${fmt(p.debt)}.`:' ¡Ya no debes nada!'}`)}
   if(d.bx){const [op,i]=d.bx.split(':');const b=p.biz[+i];
+    if(op==='manage')return bizManage(+i);
     if(op==='grow'){if(!pay(b.v*.5))return;b.v*=1.5;b.rate=b.rate*1.02;return done(`${b.e} Amplías tu negocio. Ahora vale ${fmt(b.v)}.`)}
     p.biz.splice(+i,1);p.money+=b.v;return done(`${b.e} Vendes tu negocio (${b.n.toLowerCase()}) por ${fmt(b.v)}.`)}
   if(d.inv)return invest(d.inv);

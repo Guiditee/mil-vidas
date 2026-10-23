@@ -19,4 +19,5 @@ Es una sola página web: abre `index.html` en el navegador para jugar. La partid
 - Colegios públicos, concertados, privados o internados para tus hijos, deportes de pago, impuestos por tramos (y la tentación de hacer trampa), servicios contratados y más formas de gastar.
 - Artes marciales con cinturones que te ayudan a defenderte cuando te atacan, y el sueldo de tu cónyuge sumado a los ingresos de la familia.
 - Universidades públicas, privadas o de élite para ti y para tus hijos, que influyen en el sueldo; tus hijos tienen su carrera soñada y su propio trabajo.
+- Gestión de negocios: calidad, marketing, plantilla, precios, gerente y salud financiera; solo cierran tras avisarte.
 - Desafío del día, historia de tu vida para copiar, código de partida para cambiar de dispositivo y salón de la fama compartido (este último solo funciona dentro de claude.ai).
