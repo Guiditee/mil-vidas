@@ -385,7 +385,7 @@ function label(r){const F=r.sex==='F';return {parent:F?'Madre':'Padre',sibling:F
 const partner=()=>p.rels.find(r=>(r.role==='partner'||r.role==='spouse')&&r.alive);
 const parents=()=>p.rels.filter(r=>r.role==='parent'&&r.alive);
 const kidsOf=()=>p.rels.filter(r=>r.role==='child'&&r.alive);
-function jt(j){if(j.mil)return `${RANKS[Math.min(j.lvl,7)]} del ejército`;if(j.agent)return LV(AG_RANKS[Math.min(j.lvl,4)]);return j.t[p.sex==='F'?1:0]+(j.lvl&&!j.sport?` · nivel ${j.lvl+1}`:'')}
+function jt(j){if(j.mil)return `${rankMil(j.lvl,j.br)} · ${BR(j).n}`;if(j.agent)return LV(AG_RANKS[Math.min(j.lvl,4)]);return j.t[p.sex==='F'?1:0]+(j.lvl&&!j.sport?` · nivel ${j.lvl+1}`:'')}
 const worth=()=>p.money-p.debt+p.assets.reduce((s,a)=>s+a.v,0)+(p.biz||[]).reduce((s,b)=>s+b.v,0)+Object.values(p.inv||{}).reduce((s,v)=>s+v,0);
 const cleanName=s=>(s||'').replace(/[^\p{L} '-]/gu,'').trim().slice(0,20);
 const uniCost=()=>UT(p.uni?.type).c*W();
@@ -466,7 +466,7 @@ const ACH=[
  {id:'papers',e:'📄',n:'Papeles en regla',d:'Consigue la residencia legal'},
  {id:'world5',e:'🗺️',n:'Ciudadano del mundo',d:'Vive en 5 países en una sola vida',t:()=>(p.cnt.countries||0)>=4},
  {id:'mil',e:'🎖️',n:'Al servicio',d:'Sirve 4 años en el ejército',t:()=>(p.cnt.mil||0)>=4},
- {id:'general',e:'⭐',n:'Mi general',d:'Llega a general del ejército',t:()=>p.job?.mil&&p.job.lvl>=7},
+ {id:'general',e:'⭐',n:'Mi general',d:'Llega a lo más alto del ejército, la armada o la aviación',t:()=>p.job?.mil&&p.job.lvl>=7},
  {id:'pro',e:'⚽',n:'Profesional',d:'Ficha por un club deportivo',t:()=>!!p.job?.sport},
  {id:'champ',e:'🏅',n:'Campeón',d:'Gana un campeonato'},
  {id:'saint',e:'😇',n:'Alma buena',d:'Llega a 20 de karma',t:()=>p.karma>=20},
@@ -964,7 +964,9 @@ function ageUp(){
       ...MAJORS.map(m=>[`${MAJOR_E[m.n]} Estudiar ${m.n} en la pública (${m.y} años)`,()=>enroll(m)]),
       ['🎓 Prefiero una universidad privada o de élite',()=>'Elige carrera y universidad en 💼 Carrera → Matricularme en la universidad.'],
       ['💼 Ponerme a trabajar',()=>'Decides buscar trabajo. Mira las ofertas en Carrera.'],
-      ['🎖️ Alistarme en el ejército',()=>enlist()],
+      ['🪖 Alistarme en el Ejército de Tierra',()=>enlist('tierra')],
+      ['⚓ Alistarme en la Armada',()=>enlist('armada')],
+      ['✈️ Alistarme en el Ejército del Aire',()=>enlist('aire')],
       ['🌴 Tomarme un año sabático',()=>(st('hap',6),'Un año para pensar y viajar un poco.')]])}
   if(p.school&&!p.jail&&chance(.12)){const f=addFriend();L(`Haces ${f.sex==='F'?'una amiga':'un amigo'} nuevo en clase: ${f.first}.`)}
   if(p.uni){
@@ -985,16 +987,16 @@ function ageUp(){
     if(a>=(j.late?42:35)||p.athl<30){L(`${j.e} Te retiras: se acaba tu carrera profesional en ${j.sport.toLowerCase()}.`);p.job=null}
   }else if(j){
     j.yrs++;j.perf=clamp(j.perf+R(-8,6)+(p.s.sma>70?2:0),0,100);
-    if(j.mil){inc('mil');if(chance(.25))special('🎖️ Misión en el extranjero','Tu unidad recibe órdenes de partir a una misión de paz.',[
-      ['Ir en primera línea',()=>{if(chance(.2)){st('hea',-R(15,35));return 'Te hieren durante la misión. Vuelves con una medalla y cicatrices.'}p.job.perf=clamp(p.job.perf+15,0,100);p.karma++;return '🎖️ Cumples la misión con honores. Te condecoran.'}],
-      ['Pedir un puesto en la base',()=>{p.job.perf=clamp(p.job.perf-5,0,100);return 'Pasas la misión organizando suministros.'}]],()=>!!p.job?.mil)}
+    if(j.mil){inc('mil');const M=BR(j).mis;if(chance(.25))special(M[0],M[1],[
+      [M[2],()=>{if(chance(.2)){st('hea',-R(15,35));return 'Te hieren durante la misión. Vuelves con una medalla y cicatrices.'}p.job.perf=clamp(p.job.perf+15,0,100);p.karma++;return '🎖️ Cumples la misión con honores. Te condecoran.'}],
+      [M[3],()=>{p.job.perf=clamp(p.job.perf-5,0,100);return M[4]}]],()=>!!p.job?.mil)}
     if(j.music&&chance(.3)){
       if(chance((p.s.sma+p.s.loo)/260)){const f=R(10000,500000),m=R(5000,80000)*W();p.foll+=f;p.money+=m;grant('hit');st('hap',15);L(`🎤 ¡Tu nuevo single arrasa! ${cfmt(f)} seguidores nuevos y ${fmt(m)} en derechos.`,'good')}
       else L('🎵 Sacas un single que pasa sin pena ni gloria.');
     }
     if(j.fam)p.foll+=R(300,12000)*(j.lvl+1);
     if(j.perf<15&&chance(.5)){L(`Te despiden de tu puesto de ${jt(j).toLowerCase()}.`,'bad');p.job=null;st('hap',-12)}
-    else if(j.perf>=78&&j.yrs>=2&&chance(.45)&&(j.mil?j.lvl<7:j.lvl<5)){j.lvl++;j.sal*=1.15;j.yrs=0;st('hap',8);L(j.mil?`🎖️ Ascenso: ahora eres ${RANKS[Math.min(j.lvl,7)].toLowerCase()}.`:`📈 ¡Te ascienden! Ahora ganas ${fmt(j.sal)} al año.`,'good')}
+    else if(j.perf>=78&&j.yrs>=2&&chance(.45)&&(j.mil?j.lvl<7:j.lvl<5)){j.lvl++;j.sal*=1.15;j.yrs=0;st('hap',8);L(j.mil?`${BR(j).e} Ascenso: ahora eres ${rankMil(j.lvl,j.br).toLowerCase()}.`:`📈 ¡Te ascienden! Ahora ganas ${fmt(j.sal)} al año.`,'good')}
   }
   if(p.mob){const m=p.mob;m.yrs++;m.heat=clamp(m.heat-8,0,100);
     if(!p.jail){
@@ -1314,12 +1316,31 @@ function regularize(){
   if(chance(.15+(p.undocYrs||0)*.07)){p.undoc=false;grant('papers');st('hap',15);return done(`📄 ¡Te conceden la residencia legal en ${COUNTRIES[p.c].n}! Ya tienes papeles.`)}
   return done('📄 Te deniegan la regularización. Puedes volver a intentarlo el año que viene.');
 }
-function enlist(){
+const BRANCHES={
+  tierra:{n:'Ejército de Tierra',art:'el',e:'🪖',sal:20000,d:'Misiones en tierra y despliegues en el extranjero',
+    ranks:['Soldado','Cabo','Sargento','Teniente','Capitán','Comandante','Coronel','General'],
+    mis:['🪖 Misión en el extranjero','Tu unidad recibe órdenes de partir a una misión de paz.','Ir en primera línea','Pedir un puesto en la base','Pasas la misión organizando suministros.'],
+    die:['una emboscada durante una misión en el extranjero','Murió en acto de servicio.']},
+  armada:{n:'Armada',art:'la',e:'⚓',sal:21000,d:'Vida en alta mar, barcos y submarinos',
+    ranks:['Marinero','Cabo','Sargento','Alférez de navío','Teniente de navío','Capitán de corbeta','Capitán de navío','Almirante'],
+    mis:['⚓ Misión en alta mar','Tu barco zarpa para vigilar una zona llena de piratas.','Subir al abordaje','Quedarme en la sala de máquinas','Pasas la misión entre motores y aceite.'],
+    die:['el hundimiento de su barco durante una tormenta','Murió en acto de servicio, en alta mar.']},
+  aire:{n:'Ejército del Aire',art:'el',e:'✈️',sal:23000,sma:60,d:'Pilotos y aviones de combate; pide inteligencia 60',
+    ranks:['Soldado','Cabo','Sargento','Teniente','Capitán','Comandante','Coronel','General del Aire'],
+    mis:['✈️ Misión aérea','Te asignan a una misión de vigilancia del espacio aéreo.','Pilotar en vuelo rasante','Quedarme en la torre de control','Pasas la misión guiando a otros pilotos desde tierra.'],
+    die:['un accidente de su caza durante un entrenamiento','Murió en acto de servicio, a los mandos de su avión.']}};
+const BR=j=>BRANCHES[j?.br]||BRANCHES.tierra;
+function rankMil(l,k){const r=(BRANCHES[k]||BRANCHES.tierra).ranks[Math.min(l,7)];return p.sex==='F'&&r==='Marinero'?'Marinera':r}
+function branchPick(){const map={};
+  Object.entries(BRANCHES).forEach(([k,B])=>map[k]=()=>done(enlist(k)));
+  openModal(`<p class="eyebrow">🎖️ Fuerzas Armadas</p><h2>¿Dónde te alistas?</h2><p class="muted">Sueldo fijo, ascensos por rangos y misiones. Hace falta salud 50 y no tener antecedentes.</p><div class="choices">${Object.entries(BRANCHES).map(([k,B])=>`<button class="btn ghost" data-k="${k}" ${B.sma&&p.s.sma<B.sma?'disabled':''}>${B.e} ${B.n} · ${fmt(B.sal*W())} al año · ${B.d}</button>`).join('')}</div>`,map)}
+function enlist(k='tierra'){const B=BRANCHES[k]||BRANCHES.tierra;
   if(p.s.hea<50)return 'No pasas el reconocimiento médico. Necesitas más salud.';
   if(p.record>0)return 'Con antecedentes penales no te aceptan en el ejército.';
   if(p.undoc)return 'Sin papeles no puedes alistarte en el ejército.';
-  p.uni=null;hire({t:['Soldado','Soldado'],e:'🎖️',sal:20000},{mil:true});
-  return '🎖️ Te alistas en el ejército. Empiezas como soldado raso.';
+  if(B.sma&&p.s.sma<B.sma)return `${B.e} Para entrar en ${B.art} ${B.n} necesitas inteligencia ${B.sma}.`;
+  p.uni=null;hire({t:[B.ranks[0],B.ranks[0]],e:B.e,sal:B.sal},{mil:true,br:k});
+  return `${B.e} Te alistas en ${B.art} ${B.n}. Empiezas como ${rankMil(0,k).toLowerCase()}.`;
 }
 function tryout(){
   const map={};
@@ -2309,7 +2330,7 @@ const RISKY={'Policía':[.003,'un tiroteo durante una persecución policial'],'B
   'Electricista':[.002,'una descarga eléctrica mientras trabajaba'],'Mecánico':[.0015,'un coche que se le cayó encima en el taller'],
   'Repartidor':[.002,'un accidente con la moto de reparto'],'Piloto de avión':[.002,'un accidente de avión'],'Cocinero':[.0005,'un incendio en la cocina del restaurante']};
 function jobRisk(){const j=p.job;if(!j||p.jail)return null;
-  if(j.mil)return [.004,'una misión militar en el extranjero','Murió en acto de servicio.'];
+  if(j.mil)return [.004,BR(j).die[0],BR(j).die[1]];
   if(j.agent)return [.004,'una misión secreta que salió mal','Su familia nunca supo los detalles.'];
   if(j.astro)return [.002,'un fallo en la nave durante una misión espacial','Su nombre quedó grabado en la historia.'];
   if(j.sport==='Automovilismo'||j.sport==='Motociclismo')return [.005,`un accidente en plena carrera de ${j.sport.toLowerCase()}`,'Ocurrió en una curva a más de 250 km/h.'];
@@ -2547,7 +2568,7 @@ function renderCareer(){
   if(p.age>=8&&p.age<=35&&!p.job?.sport){
     h+=`<h3>⚽ Deporte</h3>${bar('Forma física',p.athl)}<div class="btns" style="margin-top:10px"><button class="btn small" data-sp="train" ${full('train')?'disabled':''}>🏃 Entrenar${left('train')}</button>${p.age>=16&&p.age<=30?`<button class="btn small ghost" data-sp="try" ${full('tryout')||p.athl<50?'disabled':''}>Hacer una prueba con un club</button>`:''}</div>${p.age>=16&&p.age<=30&&p.athl<50?'<p class="note" style="margin-top:6px">Necesitas 50 de forma física para hacer una prueba.</p>':''}`;
   }
-  if(p.age>=18&&p.age<=35&&!p.job&&!p.uni)h+=`<h3>🎖️ Ejército</h3><p class="note">Sueldo fijo, ascensos por rangos y misiones en el extranjero.</p><button class="btn small" data-mil="1">Alistarme</button>`;
+  if(p.age>=18&&p.age<=35&&!p.job&&!p.uni)h+=`<h3>🎖️ Fuerzas Armadas</h3><p class="note">Elige entre el 🪖 Ejército de Tierra, la ⚓ Armada o el ✈️ Ejército del Aire. Sueldo fijo, ascensos por rangos y misiones.</p><button class="btn small" data-mil="1">Alistarme</button>`;
   if(!p.job&&p.age>=14&&p.alive){
     const left=PER_YEAR-used('apply');
     h+=`<h3>📋 Ofertas de empleo</h3><p class="note">Te quedan ${left} solicitudes este año · sueldos de ${COUNTRIES[p.c].n}</p>`+JOBS.map((j,i)=>{const why=jobReq(j);
@@ -2631,7 +2652,7 @@ $('#panel').addEventListener('click',e=>{
   if(d.papers)return regularize();
   if(d.x){const [m,a,arg]=d.x.split(':');return X[m]&&X[m](a,arg)}
   if(d.mob)return joinMob(+d.mob);
-  if(d.mil)return done(enlist());
+  if(d.mil)return branchPick();
   if(d.sp==='train'){use('train');p.athl=clamp(p.athl+R(3,8)+(p.s.hea>70?2:0),0,100);st('hea',R(1,3));return done(pick(['🏃 Sales a correr al amanecer.','⚽ Entrenas con el equipo hasta tarde.','🏊 Haces largos en la piscina municipal.']))}
   if(d.sp==='try')return tryout();
   if(d.apply){const j=JOBS[+d.apply];use('apply');
