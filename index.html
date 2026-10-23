@@ -453,6 +453,8 @@ const ACH=[
  {id:'goals5',e:'🎯',n:'A por todas',d:'Cumple 5 desafíos',t:()=>(S.goalsDone||0)>=5},
  {id:'oldtimes',e:'📻',n:'Otros tiempos',d:'Nace antes de 1950',t:()=>(p.born??NOW)<1950},
  {id:'future',e:'🚀',n:'Viajero del futuro',d:'Vive en el año 2080',t:()=>yearNow()>=2080},
+ {id:'blackbelt',e:'🥋',n:'Cinturón negro',d:'Llega a cinturón negro en artes marciales',t:()=>(p.ma||0)>=90},
+ {id:'defend',e:'🦸',n:'Defensa personal',d:'Defiéndete con éxito de 3 ataques',t:()=>(p.cnt.defend||0)>=3},
  {id:'bank',e:'🏦',n:'Golpe maestro',d:'Atraca un banco y sal impune'},
  {id:'influ',e:'📱',n:'Influencer',d:'Llega a 100.000 seguidores',t:()=>p.foll>=1e5},
  {id:'star',e:'🌟',n:'Celebridad',d:'Llega a 1 millón de seguidores',t:()=>p.foll>=1e6},
@@ -533,7 +535,7 @@ function continueAs(kid){
   kids.filter(k=>k!==kid).forEach(k=>np.rels.push({...k,role:'sibling',id:uid()}));
   (old.grand||[]).filter(x=>x.pid===kid.id).forEach(x=>np.rels.push({id:uid(),role:'child',sex:x.sex,first:x.first,last:kid.last,age:x.age,bond:R(70,95),alive:true,loo:R(20,95)}));
   if(np.age>=18)np.edu=2;else if(np.age>=12){np.edu=1;np.school='Secundaria'}else if(np.age>=6)np.school='Primaria';
-  np.foll=Math.round(old.foll*.05);
+  np.foll=Math.round(old.foll*.05);if(kid.ma){np.ma=kid.ma;np.maStyle='Kárate'}
   S.lineage=S.lineage||[];S.lineage.push({n:`${old.first} ${old.last}`,born:old.born??NOW,age:old.age,rib:old.ribbon?.[0]||'🕊️'});
   p=np;S.p=p;S.gen++;queue.length=0;
   L(`🧬 Tras la muerte de ${old.first}, sigues tu vida como ${p.first}. Generación ${S.gen}.`,'good');
@@ -594,7 +596,7 @@ const EVENTS=[
   ['Prefiero el ajedrez',()=>(st('sma',4),'Te apuntas al club de ajedrez y ganas un torneo local.')],
   ['Paso',()=>'Te quedas en casa jugando a la consola.']]},
  {min:8,max:15,txt:()=>'Un compañero se burla de ti en el recreo todos los días.',ch:[
-  ['Plantarle cara',()=>chance(.55)?(st('hap',6),'Le dejas sin palabras. No vuelve a molestarte.'):(st('hea',-6),'Acabáis a empujones y sales peor parado.')],
+  ['Plantarle cara',()=>chance(.55+(p.ma||0)/200)?(st('hap',6),'Le dejas sin palabras. No vuelve a molestarte.'):(st('hea',-6),'Acabáis a empujones y sales peor parado.')],
   ['Contárselo al tutor',()=>(st('hap',3),'El colegio habla con sus padres y se acaba.')],
   ['Aguantarme',()=>(st('hap',-8),'Lo aguantas en silencio. Se te hace largo el curso.')]]},
  {min:9,max:16,cond:()=>p.rels.some(r=>r.role==='sibling'&&r.alive),txt:()=>'Encuentras el diario secreto de tu hermano.',ch:[
@@ -641,6 +643,7 @@ const EVENTS=[
   ['Quedar a tomar algo',()=>{if(chance(.4+p.s.loo/300+(has('charming')?.15:0))){const c=addLove(person('partner',{sex:loveSex(),age:clamp(p.age+R(-4,4),18,99)}));st('hap',10);return `Conoces a ${c.first}. Hay chispa. Empezáis a salir.`}st('hap',-3);return 'No se parece en nada a sus fotos. Cena incómoda.'}],
   ['Ignorarlo',()=>'Borras la app. Otra vez.']]},
  {min:18,max:90,txt:()=>'Ves a alguien robando la cartera a una señora mayor.',ch:[
+  [maOpt('Detener al ladrón'),()=>fight(0)?(p.karma+=4,inc('defend'),st('hap',10),p.foll+=R(200,5000),'🥋 Le reduces en dos segundos y lo retienes hasta que llega la policía. Eres el héroe del barrio.'):(st('hea',-R(8,20)),'El ladrón se zafa y te deja un ojo morado.')],
   ['Perseguir al ladrón',()=>chance(.5)?(p.karma+=3,st('hap',8),p.foll+=R(50,2000),'Le recuperas la cartera. Sales en las noticias locales.'):(st('hea',-10),'El ladrón te tira al suelo y escapa.')],
   ['Llamar a la policía',()=>{p.karma++;return 'La policía llega tarde, pero la señora te da las gracias.'}],
   ['Mirar a otro lado',()=>{p.karma-=2;st('hap',-3);return 'Sigues andando. No te sientes bien.'}]]},
@@ -654,6 +657,7 @@ const EVENTS=[
   ['Aceptar',()=>{p.karma-=3;if(chance(.7)){p.money+=5000;return 'Recogen las maletas a la semana. Nunca sabrás qué había dentro.'}return goJail(R(2,4),'encubrimiento')}],
   ['Rechazarlo',()=>'Le cierras la puerta en las narices.']]},
  {min:20,max:55,txt:()=>'Te roban el móvil en el metro.',ch:[
+  [maOpt('Recuperar el móvil'),()=>fight(.05)?(inc('defend'),st('hap',8),'🥋 Le haces una llave en el andén y te devuelve el móvil.'):(st('hea',-R(5,15)),'Se revuelve, te empuja y se escapa con tu móvil.')],
   ['Perseguir al ladrón',()=>chance(.35)?(st('hap',6),'Le alcanzas en la escalera. Lo suelta y huye.'):(st('hea',-4),'Tropiezas y te quedas sin móvil.')],
   ['Denunciarlo',()=>'Pones la denuncia. No lo vuelves a ver.'],
   ['Resignarme',()=>(st('hap',-4),'Te compras otro. Qué remedio.')]]},
@@ -789,6 +793,34 @@ const EVENTS=[
  {min:20,max:110,cond:()=>p.rels.some(r=>r.role==='spouse'&&r.alive),txt:()=>'Llega vuestro aniversario de boda.',ch:[
   ['Preparar una cena sorpresa',()=>{partner().bond+=10;st('hap',5);return 'Velas, su plato favorito y una carta escrita a mano.'}],
   ['Se me había olvidado…',()=>{partner().bond-=10;return 'Te pasas la semana pidiendo perdón.'}]]},
+ // te atacan
+ {w:.5,min:12,max:90,txt:()=>'Un tipo te corta el paso en un callejón y te exige la cartera.',ch:[
+  ['Darle la cartera',()=>{const x=Math.min(p.money,R(20,300));p.money-=x;addStress(6);return `Le das ${fmt(x)}. Se va corriendo.`}],
+  [maOpt('Defenderme'),()=>fight(.1)?(inc('defend'),st('hap',8),'🥋 Le desarmas con una llave y sale huyendo. La gente que mira aplaude.'):(st('hea',-R(10,25)),'Lo intentas, pero es más fuerte. Te llevas varios golpes y se queda con tu cartera.')],
+  ['Salir corriendo',()=>chance(.4+p.athl/200)?'Corres más que él. Te salvas por poco.':(st('hea',-R(5,15)),'Te alcanza y te tira al suelo.')],
+  ['Gritar pidiendo ayuda',()=>chance(.5)?'Salen unos vecinos y el ladrón huye.':(st('hea',-R(5,12)),'No aparece nadie. Te empuja y se lleva lo que llevas.')]]},
+ {w:.5,min:16,max:90,txt:()=>'En un bar, un borracho busca pelea contigo.',ch:[
+  ['Ignorarle y salir',()=>'Te vas antes de que la cosa se complique.'],
+  [maOpt('Inmovilizarle'),()=>fight(0)?(inc('defend'),st('hap',5),'🥋 Le inmovilizas sin hacerle daño hasta que se calma. El bar entero te invita a una ronda.'):(st('hea',-R(5,15)),'Se te escapa y te da un buen puñetazo.')],
+  ['Pelear a lo bruto',()=>{p.karma--;return chance(.35+p.athl/250)?'Ganas la pelea, pero te echan del bar.':(st('hea',-R(10,20)),'Pierdes la pelea y la dignidad.')}],
+  ['Avisar al portero',()=>'El portero lo saca a la calle.']]},
+ {w:.5,min:18,max:99,txt:()=>'De madrugada oyes ruidos: alguien ha entrado en tu casa.',ch:[
+  ['Esconderme y llamar a la policía',()=>{const x=Math.min(p.money,R(200,3000));p.money-=x;return `La policía llega tarde: se han llevado ${fmt(x)} en objetos de valor.`}],
+  [maOpt('Enfrentarme al ladrón'),()=>fight(.15)?(inc('defend'),p.karma+=2,st('hap',8),'🥋 Le reduces en el pasillo y lo retienes hasta que llega la policía.'):(st('hea',-R(10,30)),'Forcejeáis y sales herido. El ladrón escapa por la ventana.')],
+  ['Enfrentarme con lo primero que pillo',()=>chance(.4)?'Sale huyendo al verte con la escoba en alto.':(st('hea',-R(10,25)),'Te empuja contra la pared y escapa.')]]},
+ {w:.5,min:10,max:17,txt:()=>'Unos chicos mayores te acorralan a la salida del colegio.',ch:[
+  ['Darles lo que piden',()=>(st('hap',-6),'Te quitan la merienda y el móvil.')],
+  [maOpt('Plantarles cara'),()=>fight(-.05)?(inc('defend'),st('hap',10),'🥋 Esquivas al primero, tumbas al segundo y los demás salen corriendo.'):(st('hea',-R(5,15)),'Son demasiados. Vuelves a casa con un ojo morado.')],
+  ['Salir corriendo',()=>chance(.6)?'Les das esquinazo por el parque.':(st('hea',-6),'Te alcanzan y te empujan al suelo.')],
+  ['Contárselo a un profesor',()=>(st('hap',2),'El colegio los expulsa una semana.')]]},
+ {w:.5,min:18,max:90,cond:()=>p.assets.some(a=>a.k==='car'),txt:()=>'Parado en un semáforo, alguien abre la puerta de tu coche e intenta sacarte.',ch:[
+  ['Entregarle las llaves',()=>{const i=p.assets.findIndex(a=>a.k==='car');const c=p.assets.splice(i,1)[0];addStress(10);return `Se lleva tu ${c.n.toLowerCase()}. Nunca lo recuperas.`}],
+  [maOpt('Defenderme'),()=>fight(.2)?(inc('defend'),st('hap',8),'🥋 Le haces una luxación y huye a pie, sin el coche.'):(st('hea',-R(10,25)),'Te saca del coche a la fuerza, aunque al final huye sin él.')],
+  ['Acelerar',()=>chance(.6)?'Aceleras y se cae a la calzada. Te libras.':(st('hea',-R(3,10)),'Chocas con el coche de delante. Al menos el ladrón huye.')]]},
+ {w:.5,min:14,max:90,txt:()=>'De noche, un desconocido te sigue y te agarra del brazo.',ch:[
+  ['Soltarme y correr',()=>chance(.6)?'Te sueltas y corres hasta una calle con gente.':(st('hea',-R(5,12)),'Forcejeas y te haces daño en la muñeca.')],
+  [maOpt('Defenderme'),()=>fight(.05)?(inc('defend'),st('hap',6),'🥋 Te liberas con una técnica que has practicado mil veces. Huye asustado.'):(st('hea',-R(8,18)),'Te defiendes como puedes y consigues escapar, con algún golpe.')],
+  ['Gritar con todas mis fuerzas',()=>chance(.6)?'Se asusta y desaparece.':'Sigue tirando de ti hasta que pasa un coche y huye.']]},
  // caseros
  {min:18,max:120,cond:()=>p.assets.some(a=>a.rent),txt:()=>'Uno de tus inquilinos lleva meses sin pagar el alquiler.',ch:[
   ['Negociar un plan de pagos',()=>chance(.6)?'Acepta y empieza a pagar poco a poco.':'Promete pagar… y vuelve a no hacerlo.'],
@@ -857,7 +889,7 @@ function runQueue(){
     openModal(`<p class="res">${res}</p><div class="choices"><button class="btn" data-k="ok">Continuar</button></div>`,{ok:()=>{queue.shift();runQueue()}},false);
   });
   if(['🌍','🌊','☄️','⚔️'].some(x=>(ev._t||'').startsWith(x)||(ev.title||'').startsWith(x)))shake();
-  openModal(`<p class="eyebrow">${p.age} años</p><h2>${ev.title||(p.jail?'⛓️ En prisión':'🎲 Algo pasa')}</h2><p>${ev._t}</p><div class="choices">${ev.ch.map((c,i)=>`<button class="btn ghost" data-k="c${i}">${c[0]}</button>`).join('')}</div>`,map,false);
+  openModal(`<p class="eyebrow">${p.age} años</p><h2>${ev.title||(p.jail?'⛓️ En prisión':'🎲 Algo pasa')}</h2><p>${ev._t}</p><div class="choices">${ev.ch.map((c,i)=>{const lb=typeof c[0]==='function'?c[0]():c[0];return lb?`<button class="btn ghost" data-k="c${i}">${lb}</button>`:''}).join('')}</div>`,map,false);
 }
 function special(title,txt,ch,cond){queue.push({title,_t:txt,ch,cond})}
 function enroll(m){p.uni={m:m.n,left:m.y};if(p.job&&!p.job.pt)p.job=null;return `${MAJOR_E[m.n]||'🎓'} Te matriculas en ${m.n}. Te esperan ${m.y} años de estudio.`}
@@ -933,7 +965,7 @@ function ageUp(){
   if(p.mob){const m=p.mob;m.yrs++;m.heat=clamp(m.heat-8,0,100);
     if(!p.jail){
       if(chance(m.heat/250))L(mobBust('pertenencia a organización criminal'),'bad');
-      else if(chance((.05+m.rank*.01)*(p.subs?.guard?.3:1))){st('hea',-R(10,30));L('⚠️ Una banda rival te tiende una emboscada. Sales con heridas.','bad')}
+      else if(chance((.05+m.rank*.01)*(p.subs?.guard?.3:1)*(1-(p.ma||0)/200))){st('hea',-R(10,30));L('⚠️ Una banda rival te tiende una emboscada. Sales con heridas.','bad')}
     }}
   // redes
   if(p.foll>0)p.foll=Math.floor(p.foll*(p.job?.fam||p.job?.sport?.97:.9));
@@ -963,7 +995,9 @@ function ageUp(){
   if(rent)L(`🏘️ Cobras ${fmt(rent)} de alquileres.`,'money');
   earn+=yearSpecial();
   if(p.mob&&!p.jail){const s=(2000+p.mob.rank*p.mob.rank*6000)*(.7+Math.random()*.6);earn+=s;untax+=s;L(`🕴️ Tu parte de los negocios de la familia: ${fmt(s)}.`,'money')}
-  let tx=incomeTax(Math.max(0,earn-untax)),ptx=p.jail?0:propertyTax();
+  let spTax=0;const spo=p.rels.find(r=>r.role==='spouse'&&r.alive);
+  if(spo){const se=(spo.job?.sal||0)+(spo.pension||0);if(se>0){earn+=se;untax+=se;spTax=incomeTax(se);L(`💍 Ingresos de ${spo.first}${spo.job?` (${spT(spo).toLowerCase()})`:' (pensión)'}: ${fmt(se)}.`,'money')}}
+  let tx=incomeTax(Math.max(0,earn-untax))+spTax,ptx=p.jail?0:propertyTax();
   if(p.donated){tx=Math.max(0,tx-p.donated*.35);p.donated=0}
   if(p.evade&&tx>0){const saved=tx*.5;tx-=saved;p.evaded=(p.evaded||0)+saved;
     if(chance(.15)){const fine=p.evaded*3;p.evaded=0;p.evade=false;p.debt+=fine;p.record++;L(`🧾 ¡Inspección de Hacienda! Descubren que no lo declarabas todo. Multa de ${fmt(fine)}.`,'bad')}}
@@ -1100,7 +1134,7 @@ const JAIL_ACTS=[
  {k:'jlib',e:'📚',n:'Ir a la biblioteca',d:'Inteligencia',fn:()=>{st('sma',R(2,5));return `Te lees «${pick(BOOKS)}» en la celda.`}},
  {k:'jgood',e:'😇',n:'Portarte de forma ejemplar',d:'Puede rebajar la condena',fn:()=>{p.karma++;if(chance(.3)){p.jail.left--;if(p.jail.left<=0){release();return '🔓 Te conceden la libertad anticipada por buena conducta.'}return 'El juez de vigilancia te rebaja la condena un año.'}return 'Nadie parece darse cuenta, pero sigues intentándolo.'}},
  {k:'jappeal',e:'⚖️',n:'Apelar la condena',d:'Un abogado lo intenta',cost:()=>2000,req:()=>p.jail?.appealed?'Ya apelaste':'',fn:()=>{p.jail.appealed=true;if(chance(.2)){release();return '🔓 ¡El tribunal acepta la apelación! Sales en libertad.'}return 'El tribunal rechaza tu apelación.'}},
- {k:'jfight',e:'🤜',n:'Pelearte con otro preso',d:'Ganarte respeto',fn:()=>{p.karma--;if(chance(.5)){st('hea',-R(5,15));return 'Te llevas una paliza. Acabas en la enfermería.'}st('hap',3);return 'Ganas la pelea. Ahora te respetan en el módulo.'}},
+ {k:'jfight',e:'🤜',n:'Pelearte con otro preso',d:'Ganarte respeto',fn:()=>{p.karma--;if(chance(clamp(.5-(p.ma||0)/180,.05,.9))){st('hea',-R(5,15));return 'Te llevas una paliza. Acabas en la enfermería.'}st('hap',3);return 'Ganas la pelea. Ahora te respetan en el módulo.'}},
  {k:'jescape',e:'🏃',n:'Intentar fugarte',d:'Minijuego: el laberinto',special:()=>{use('jescape');maze()}},
 ];
 const FISH=['una trucha','una carpa','un lucio','un salmón','una lubina','un bagre','una perca','un pez espada','un atún rojo','una anguila','un esturión','un pez luna'];
@@ -1126,7 +1160,6 @@ const SPORT_ACTS=[
  {k:'sfoot',e:'⚽',n:'Partido con amigos',d:'Gratis y divertido',min:6,fn:()=>{st('hea',R(1,4));st('hap',R(2,5));p.athl=clamp(p.athl+R(1,3),0,100);if(chance(.08)){st('hea',-R(5,12));return 'Te tuerces el tobillo en una entrada.'}return pick(['Metes un golazo por la escuadra.','Fallas un penalti, pero ganáis igual.'])}},
  {k:'sswim',e:'🏊',n:'Bono de piscina',d:'Salud y forma física',min:6,cost:()=>200,fn:()=>{st('hea',R(2,5));p.athl=clamp(p.athl+R(2,4),0,100);addStress(-3);return 'Haces largos hasta que se te arrugan los dedos.'}},
  {k:'stennis',e:'🎾',n:'Clases de tenis',d:'Forma física y amigos',min:8,cost:()=>600,fn:()=>{p.athl=clamp(p.athl+R(2,5),0,100);st('hap',R(1,4));if(chance(.2)){const f=addFriend();return `Tu compañero de dobles, ${f.first}, se convierte en tu amigo.`}return 'Tu revés mejora una barbaridad.'}},
- {k:'smart',e:'🥋',n:'Artes marciales',d:'Disciplina y menos estrés',min:6,cost:()=>500,fn:()=>{p.athl=clamp(p.athl+R(2,5),0,100);st('hea',R(1,3));addStress(-5);return pick(['Consigues un cinturón nuevo.','Rompes una tabla de un golpe. Duele, pero mola.'])}},
  {k:'sbike',e:'🚵',n:'Ruta en bici de montaña',d:'Adrenalina',min:10,fn:()=>{if(chance(.12)){st('hea',-R(5,15));return 'Te comes una piedra y sales volando por encima del manillar.'}p.athl=clamp(p.athl+R(1,4),0,100);st('hap',R(3,6));return 'Bajas la montaña a toda velocidad. Increíble.'}},
  {k:'srun',e:'🏃',n:'Correr una maratón',d:'Inscripción',min:16,cost:()=>80,fn:()=>{if(chance(clamp(p.athl/90,.1,.95))){st('hap',R(6,12));p.athl=clamp(p.athl+3,0,100);return `🏅 Terminas los 42 kilómetros en ${R(3,5)} horas. ¡Lo has conseguido!`}st('hea',-R(2,6));return 'Abandonas en el kilómetro 30 con calambres.'}},
  {k:'smatch',e:'🏟️',n:'Ver un partido en el estadio',d:'Ambiente único',min:6,cost:()=>80,fn:()=>{st('hap',R(3,7));return chance(.5)?'¡Gana tu equipo! Te quedas sin voz.':'Tu equipo pierde en el último minuto. Qué rabia.'}},
@@ -1584,12 +1617,14 @@ function yearLife(a){
   if((p.langs[nl]||0)<100){const b=p.langs[nl]||0;p.langs[nl]=Math.min(100,b+R(4,10));if(b<50&&p.langs[nl]>=50)L(`🗣️ A base de vivir aquí, ya hablas ${nl.toLowerCase()} con soltura.`,'good')}
   for(const r of kidsOf()){if(r.age>=18)continue;const s=r.st||(r.st={sma:R(20,90),hea:R(70,100),loo:R(20,90),hap:R(60,95)});
     if(r.age>=6){const sc=SCH(r);s.sma=clamp(s.sma+R(0,sc.sma),0,100);if(sc.bond)r.bond=clamp(r.bond+sc.bond,0,100)}
+    if(r.ks==='martial'&&r.age>=4)r.ma=Math.min(100,(r.ma||0)+R(3,7));
     if(r.ks&&r.age>=4){s.hea=clamp(s.hea+2,0,100);s.hap=clamp(s.hap+1,0,100);r.bond=clamp(r.bond+1,0,100)}
     if(p.style==='estricto'){s.sma=clamp(s.sma+R(0,2),0,100);r.bond=clamp(r.bond-R(0,2),0,100)}
     else if(p.style==='permisivo'){s.hap=clamp(s.hap+R(0,2),0,100);s.sma=clamp(s.sma-R(0,1),0,100);r.bond=clamp(r.bond+1,0,100)}
     else{s.sma=clamp(s.sma+R(0,1),0,100);s.hap=clamp(s.hap+R(0,1),0,100)}}
   healthYear(a);schoolYear(a);
   if(a>=3&&!p.jail&&chance(.25)){const hd=pick(HOLIDAYS.filter(h=>a>=(h.min||0)));if(hd)special(hd.t,typeof hd.txt==='function'?hd.txt():hd.txt,hd.ch)}
+  spouseYear();
   p.grand=p.grand||[];for(const x of p.grand)x.age++;
   for(const r of kidsOf())if(r.age>=20&&r.age<=45&&p.grand.length<15&&chance(.1)){const sx=pick(['M','F']),gk={id:uid(),first:pick(sx==='M'?MN:FN),sex:sx,age:0,pid:r.id,pn:r.first};
     p.grand.push(gk);st('hap',8);L(`👶 ¡${g('Eres abuelo','Eres abuela')}! ${r.first} tiene ${sx==='F'?'una niña':'un niño'}: ${gk.first}.`,'good')}
@@ -2032,6 +2067,57 @@ function renderMoney(){
     h+=`<h3>🛎️ Servicios contratados</h3><p class="note">Se pagan cada año mientras los tengas.</p>`+SERVICES.map(s=>{const no=s.req&&s.req();return `<div class="row"><div><b>${s.e} ${s.n}</b><small>${fmt(s.c*W())} al año · ${s.d}</small></div>${btn('svc','toggle:'+s.k,p.subs[s.k]?'Dar de baja':'Contratar',!p.subs[s.k]&&s.req&&!s.req()||p.jail,!p.subs[s.k])}</div>`}).join('')}
   return h}
 
+/* ---------- trabajo del cónyuge ---------- */
+const SPOUSE_JOBS=[{t:['Profesor','Profesora'],s:29000},{t:['Enfermero','Enfermera'],s:31000},{t:['Programador','Programadora'],s:42000},{t:['Abogado','Abogada'],s:48000},
+  {t:['Médico','Médica'],s:62000},{t:['Camarero','Camarera'],s:15500},{t:['Dependiente','Dependienta'],s:15000},{t:['Electricista','Electricista'],s:24000},
+  {t:['Contable','Contable'],s:37000},{t:['Arquitecto','Arquitecta'],s:44000},{t:['Policía','Policía'],s:27000},{t:['Diseñador','Diseñadora'],s:27000}];
+const spT=r=>r.job?r.job.t[r.sex==='F'?1:0]:'';
+function giveJob(r){r.job=null;if(r.age>=18&&r.age<65&&chance(.8)){const j=pick(SPOUSE_JOBS);r.job={t:j.t,sal:j.s*W()*(.85+Math.random()*.3)}}}
+function spouseYear(){for(const r of p.rels){if(r.role!=='spouse'||!r.alive)continue;
+  if(!('job' in r))giveJob(r);
+  if(r.job){r.job.sal*=1.02;if(r.age>=65){r.pension=r.job.sal*.6;r.job=null;L(`🏖️ ${r.first} se jubila.`)}
+    else if(chance(.04)){r.job=null;L(`💼 ${r.first} se queda sin trabajo.`,'bad');addStress(4)}}
+  else if(!r.pension&&r.age>=18&&r.age<60&&chance(.15)){giveJob(r);if(r.job)L(`💼 ${r.first} encuentra trabajo de ${spT(r).toLowerCase()}.`,'good')}}}
+
+/* ---------- artes marciales y asesinato ---------- */
+const MA_STYLES=['Kárate','Judo','Taekwondo','Kung-fu','Krav magá','Jiu-jitsu','Capoeira','Muay thai','Aikido'];
+const BELTS=['Blanco','Amarillo','Naranja','Verde','Azul','Marrón','Negro'];
+function belt(){return BELTS[Math.min(6,Math.floor((p.ma||0)/15))]}
+const maCost=()=>p.age<18?0:300;
+function fight(diff){return chance(clamp(.12+(p.ma||0)/100-diff+(p.athl-50)/400,.05,.95))}
+function maOpt(t){return ()=>(p.ma||0)>=10&&p.maStyle?`🥋 ${t} con ${p.maStyle.toLowerCase()} (cinturón ${belt().toLowerCase()})`:null}
+function maTrainOnce(){use('matrain');const before=belt();
+  const gain=Math.max(1,R(3,7)+(has('athletic')?2:0)-(has('lazy')?2:0));p.ma=Math.min(100,(p.ma||0)+gain);
+  p.athl=clamp(p.athl+2,0,100);st('hea',1);addStress(-4);
+  if(belt()!==before){celebrate();return done(`🥋 ¡Pasas el examen de ${p.maStyle.toLowerCase()} y consigues el cinturón ${belt().toLowerCase()}! Nivel ${p.ma}/100.`)}
+  return done(`🥋 Entrenas ${p.maStyle.toLowerCase()} en el dojo. Nivel ${p.ma}/100 · cinturón ${belt().toLowerCase()}.`)}
+function maStylePick(then){const map={};MA_STYLES.forEach((s,i)=>map['s'+i]=()=>{const keep=p.maStyle&&p.maStyle!==s;p.maStyle=s;if(keep)p.ma=Math.round((p.ma||0)*.6);then?then():(save(),render(),result(`🥋 Ahora entrenas ${s.toLowerCase()}.${keep?' Parte de lo aprendido te sirve.':''}`))});
+  openModal(`<p class="eyebrow">🥋 Artes marciales</p><h2>¿Qué estilo quieres aprender?</h2><p class="muted">Cuanto más nivel tengas, más fácil será defenderte si alguien te ataca.${p.maStyle?' Si cambias de estilo, conservas parte de tu nivel.':''}</p><div class="choices">${MA_STYLES.map((s,i)=>`<button class="btn ghost" data-k="s${i}">${s}${p.maStyle===s?' (actual)':''}</button>`).join('')}</div>`,map)}
+X.ma=a=>{
+  if(a==='train'){const go=()=>{if(maCost()&&!pay(maCost()))return result(`Las clases cuestan ${fmt(maCost())}.`);maTrainOnce()};return p.maStyle?go():maStylePick(go)}
+  if(a==='style')return maStylePick();
+  if(a==='tourn'){use('matourn');if(chance(clamp((p.ma||0)/120,.05,.9))){const pr=Math.round(R(200,3000)*((p.ma||0)/30)*W());p.money+=pr;st('hap',8);p.foll+=R(50,3000);return done(`🏆 ¡Ganas el torneo de ${p.maStyle.toLowerCase()}! Premio: ${fmt(pr)}.`)}
+    st('hea',-R(0,5));return done(`🥋 Caes en ${pick(['cuartos de final','semifinales','la final'])} del torneo. El año que viene será.`)}
+};
+function renderMA(){if(p.age<5)return '';
+  return banner('🥋 Artes marciales',p.maStyle?`${p.maStyle} · cinturón ${belt().toLowerCase()} · nivel ${p.ma||0}/100. Te ayuda a defenderte si te atacan.`:'Elige un estilo y entrena. Te servirá para defenderte si alguien te ataca.',
+    btn('ma','train',p.maStyle?`Entrenar${maCost()?` (${fmt(maCost())})`:''}`:'Elegir estilo y empezar',full('matrain'))+(p.maStyle?btn('ma','tourn','🏆 Torneo',(p.ma||0)<40||full('matourn'),1)+btn('ma','style','Cambiar de estilo',0,1):''))}
+
+X.murder=()=>{const map={},tg=p.rels.filter(r=>r.alive&&r.role!=='ex');
+  tg.forEach(r=>map['r'+r.id]=()=>murderConfirm(r));map.stranger=()=>murderConfirm(null);
+  openModal(`<p class="eyebrow">☠️ Asesinato</p><h2>¿A quién?</h2><p class="muted">Es el delito más grave del juego: si te pillan, pasarás décadas en la cárcel, y tu karma y tu familia nunca lo olvidarán.</p><div class="choices">${tg.map(r=>`<button class="btn ghost" data-k="r${r.id}">${relE(r)} ${r.first} · ${label(r).toLowerCase()}</button>`).join('')}<button class="btn ghost" data-k="stranger">👤 Un desconocido</button><button class="btn" data-k="x">Cancelar</button></div>`,{...map,x:closeModal})};
+function murderConfirm(t){const who=t?t.first:'un desconocido';
+  openModal(`<p class="eyebrow">☠️ No hay vuelta atrás</p><h2>¿Seguro?</h2><p>Vas a acabar con la vida de ${who}. No se puede deshacer.</p><div class="choices"><button class="btn" data-k="no">No, me arrepiento</button><button class="btn ghost" data-k="yes">Sí, hacerlo</button></div>`,{
+    no:()=>done('Te lo piensas mejor y te vas a casa. Menos mal.'),yes:()=>done(murder(t))},false)}
+function murder(t){use('cmurder');p.karma-=25;addStress(30);inc('murders');st('hap',-15);
+  const who=t?t.first:'un desconocido';
+  if(t){t.alive=false;t.killed=true;
+    p.rels.forEach(r=>{if(r!==t&&r.alive&&['parent','sibling','child','spouse','partner'].includes(r.role))r.bond=clamp(r.bond-15,0,100)})}
+  const caught=clamp(.65-(p.s.sma-50)/200-(p.mob?p.mob.rank*.06:0)+(t?.1:0),.15,.9);
+  if(chance(caught))return goJail(p.age<18?R(3,6):R(20,45),`el asesinato de ${who}`);
+  if(p.mob)mobResp(10);
+  return `La policía investiga la muerte de ${who}, pero nunca encuentra al culpable. Tú sabes la verdad, y no te deja dormir.`}
+
 /* ---------- gente ---------- */
 function relMenu(r){
   if(!r.alive)return result(`🕊️ ${r.first} falleció a los ${r.age} años. Le echas de menos.`);
@@ -2049,8 +2135,9 @@ function relMenu(r){
   if(r.role==='child'&&r.age>=3&&r.age<18&&p.age>=18&&!p.jail)acts.push(['school',`${SCH(r).e} Colegio: ${SCH(r).n.toLowerCase()}`],['ksport',r.ks?`${KS(r).e} Deporte: ${KS(r).n}`:'⚽ Apuntarle a un deporte']);
   if(r.role==='child'&&r.age<18&&p.age>=18&&!p.jail)acts.push(['homework','📚 Ayudarle con los deberes'],['club',`⚽ Apuntarle a actividades (${fmt(300)})`],['spoil','🎁 Mimarle'],['ground','🚫 Castigarle']);
   if(pt&&p.age>=18&&!p.jail)acts.push(['date','🌹 Cita romántica']);
+  if(r.role==='spouse'&&r.age<65&&!p.jail)acts.push(['spjob',r.job?'💼 Animarle a pedir un aumento':'💼 Animarle a buscar trabajo']);
   if(r.role==='spouse'&&!r.honey&&!p.jail)acts.push(['honey',`🌴 Luna de miel (${fmt(3000)})`]);
-  const once=['time','talk','gift','money','argue','baby','propose','homework','club','spoil','ground','date'];
+  const once=['time','talk','gift','money','argue','baby','propose','homework','club','spoil','ground','date','spjob'];
   const map={close:closeModal};
   acts.forEach(([k])=>map[k]=()=>{if(once.includes(k))use(r.id+k);const t=relAction(r,k,bio);r.bond=clamp(r.bond,0,100);done(t)});
   map.school=()=>schoolPick(r);map.ksport=()=>kidSportPick(r);
@@ -2064,10 +2151,12 @@ function relAction(r,k,bio){
     case 'gift':if(!pay(50))return 'No tienes dinero para el regalo.';r.bond+=R(6,14);return `🎁 Le regalas ${pick(GIFTS)} a ${n}. Le encanta.`;
     case 'money':if(chance(r.bond/140)){const x=p.age<18?R(5,40):R(100,1500);p.money+=x;return `💵 ${n} te da ${fmt(x)}.`}r.bond-=4;return `${n} te dice que el dinero no cae de los árboles.`;
     case 'argue':r.bond-=R(8,20);st('hap',-R(1,4));return pick([`Discutís por política, ${n} y tú.`,`Discutís por quién friega los platos.`,`Os gritáis por una tontería.`]);
-    case 'propose':if(chance(r.bond/110)){r.role='spouse';inc('weds');st('hap',15);celebrate();return pay(3000)?`💍 ¡${n} dice que sí! Os casáis en una boda preciosa.`:`💍 ¡${n} dice que sí! Os casáis en el juzgado, sin fiesta.`}r.bond-=10;st('hap',-10);return `${n} te dice que aún no está preparad${r.sex==='F'?'a':'o'}.`;
+    case 'propose':if(chance(r.bond/110)){r.role='spouse';inc('weds');if(!('job' in r))giveJob(r);st('hap',15);celebrate();return pay(3000)?`💍 ¡${n} dice que sí! Os casáis en una boda preciosa.`:`💍 ¡${n} dice que sí! Os casáis en el juzgado, sin fiesta.`}r.bond-=10;st('hap',-10);return `${n} te dice que aún no está preparad${r.sex==='F'?'a':'o'}.`;
     case 'baby':{if(bio){if(chance(.5)){const c=addChild();st('hap',12);celebrate();return `👶 ¡Nace tu ${c.sex==='F'?'hija':'hijo'} ${c.first}!`}return 'Este año no hay suerte.'}if(!pay(3000))return 'No tenéis dinero para los trámites de adopción.';const c=addChild(R(0,2));st('hap',12);return `👶 Adoptáis a ${c.first}, ${c.sex==='F'?'una niña':'un niño'} de ${c.age} años.`}
     case 'breakup':r.role='ex';p.rels=p.rels.filter(x=>x!==r);st('hap',-6);return `💔 Lo dejas con ${n}.`;
     case 'divorce':{const x=p.money/2;p.money-=x;r.role='ex';p.rels=p.rels.filter(y=>y!==r);st('hap',-12);grant('divorce');return `💔 Te divorcias de ${n}. Te cuesta ${fmt(x)}.`}
+    case 'spjob':if(r.job){if(chance(.5)){r.job.sal*=1.1;r.bond+=3;return `💼 ${n} pide un aumento y se lo dan. Ahora gana ${fmt(r.job.sal)} al año.`}return `💼 ${n} pide un aumento, pero su jefe le dice que no.`}
+      if(chance(.5)){giveJob(r);if(r.job){r.bond+=3;return `💼 ${n} encuentra trabajo de ${spT(r).toLowerCase()}: ${fmt(r.job.sal)} al año.`}}return `💼 ${n} envía currículums, pero este año no hay suerte.`;
     case 'homework':{const s=r.st||(r.st={sma:50,hea:80,loo:50,hap:70});s.sma=clamp(s.sma+R(2,6),0,100);r.bond+=R(2,5);return `📚 Ayudas a ${n} con los deberes. Va mejorando en clase.`}
     case 'club':{if(!pay(300))return 'No tienes dinero para la inscripción.';const s=r.st||(r.st={sma:50,hea:80,loo:50,hap:70});s.hea=clamp(s.hea+R(2,6),0,100);s.hap=clamp(s.hap+R(2,6),0,100);r.bond+=R(2,6);return `⚽ Apuntas a ${n} a ${pick(['fútbol','natación','teatro','robótica','música'])}. Le encanta.`}
     case 'spoil':{const s=r.st||(r.st={sma:50,hea:80,loo:50,hap:70});s.hap=clamp(s.hap+R(3,8),0,100);s.sma=clamp(s.sma-R(0,2),0,100);r.bond+=R(4,8);return `🎁 Mimas a ${n} con caprichos. Está feliz, aunque un poco consentid${r.sex==='F'?'a':'o'}.`}
@@ -2176,9 +2265,9 @@ function cards(kind,cls=''){
 }
 function renderActs(){
   if(p.jail)return `<div class="banner"><b>⛓️ ${p.age<18?'Centro de menores':'Prisión'}</b><p class="muted" style="margin:2px 0 0">Condena: ${p.jail.total} años · te quedan ${p.jail.left}. Antecedentes: ${p.record}.</p></div><h3>🧱 Vida entre rejas</h3>${cards('j')}<p class="note" style="margin-top:12px">Desde Gente puedes pedir visitas a tu familia.${p.mob?` ${MOBS[p.mob.i].n} sigue contando contigo.`:''}</p>`;
-  let h=`<h3>🎯 Actividades</h3>${cards('a')}<h3>⚽ Deporte</h3>${cards('sp')}<h3>💸 Gastos y caprichos</h3>${cards('g')}`;
+  let h=`<h3>🎯 Actividades</h3>${cards('a')}<h3>⚽ Deporte</h3>${renderMA()}<div style="margin-top:10px">${cards('sp')}</div><h3>💸 Gastos y caprichos</h3>${cards('g')}`;
   if(p.age>=13&&yearNow()>=2004)h+=`<h3>📱 Redes sociales</h3><p class="note">${cfmt(p.foll)} seguidores · fama ${fame()}/100${p.monet?' · 💸 monetizado':''}</p>${cards('s')}`;
-  if(p.age>=12)h+=`<h3>🚔 Crimen</h3><p class="note">Puede salir bien… o acabar entre rejas. Antecedentes: ${p.record}${p.fugitive?' · ahora mismo te busca la policía':''}.</p>${cards('c','risk')}`;
+  if(p.age>=12)h+=`<h3>🚔 Crimen</h3><p class="note">Puede salir bien… o acabar entre rejas. Antecedentes: ${p.record}${p.fugitive?' · ahora mismo te busca la policía':''}.</p>${cards('c','risk')}`+(p.age>=16?`<div class="btns" style="margin-top:8px">${btn('murder','pick','☠️ Cometer un asesinato',full('cmurder'),1)}</div>`:'');
   if(p.age>=18){
     if(p.mob){const m=p.mob,o=MOBS[m.i];
       h+=`<h3>🕴️ ${o.e} ${o.n}</h3><p class="note">Rango: ${rankName(m.rank)} · ${m.yrs} ${m.yrs===1?'año':'años'} dentro${m.rank<5?` · ${rankName(m.rank+1).toLowerCase()} con ${MOB_NEED[m.rank+1]} de respeto`:''}</p>${bar('🎖️ Respeto',m.resp)}${barR('🚨 Atención policial',m.heat)}<div style="margin-top:10px">${cards('m','risk')}</div>`;
@@ -2233,7 +2322,7 @@ function renderCareer(){
   return h+renderLearn()+renderSpecial();
 }
 function renderPeople(){
-  const row=r=>`<button class="row person ${r.alive?'':'dead'}" data-rel="${r.id}"><div class="lead"><span class="em" aria-hidden="true">${relE(r)}</span><div><b>${r.first} ${r.last.split(' ')[0]}</b><small>${label(r)} · ${r.alive?`${r.age} años`:`† a los ${r.age}`}${r.role==='child'&&r.alive&&r.age>=6&&r.age<18?` · ${SCH(r).e} ${SCH(r).n.toLowerCase()}${r.ks?` · ${KS(r).e}`:''}`:''}</small></div></div>${r.alive?`<div class="bondbar">${bar('',r.bond)}</div>`:''}</button>`;
+  const row=r=>`<button class="row person ${r.alive?'':'dead'}" data-rel="${r.id}"><div class="lead"><span class="em" aria-hidden="true">${relE(r)}</span><div><b>${r.first} ${r.last.split(' ')[0]}</b><small>${label(r)} · ${r.alive?`${r.age} años`:`† a los ${r.age}`}${r.role==='spouse'&&r.alive?(r.job?` · 💼 ${spT(r).toLowerCase()} (${fmt(r.job.sal)}/año)`:r.pension?' · jubilación':' · sin trabajo'):''}${r.role==='child'&&r.alive&&r.age>=6&&r.age<18?` · ${SCH(r).e} ${SCH(r).n.toLowerCase()}${r.ks?` · ${KS(r).e}`:''}`:''}</small></div></div>${r.alive?`<div class="bondbar">${bar('',r.bond)}</div>`:''}</button>`;
   const grp=(t,f)=>{const l=p.rels.filter(f);return l.length?`<h3>${t}</h3>${l.map(row).join('')}`:''};
   let h=`<div class="btns" style="margin-top:10px">${btn('fam','tree','🌳 Árbol genealógico',0,1)}${kidsOf().length?btn('fam','style',`👪 Crianza: ${p.style||'equilibrado'}`,0,1):''}</div>`+grp('🏡 Familia',r=>r.role==='parent'||r.role==='sibling')+grp('❤️ Pareja',r=>r.role==='partner'||r.role==='spouse')+grp('🧸 Hijos',r=>r.role==='child')+grp('🤝 Amigos',r=>r.role==='friend');
   if(p.grand?.length)h+=`<h3>👶 Nietos</h3>`+p.grand.map(x=>`<div class="row"><div class="lead"><span class="em" aria-hidden="true">${x.age<3?'👶':x.sex==='F'?'👧':'👦'}</span><div><b>${x.first}</b><small>${x.sex==='F'?'Nieta':'Nieto'} · ${x.age} años · de ${x.pn}</small></div></div></div>`).join('');
