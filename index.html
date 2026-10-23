@@ -456,6 +456,7 @@ const ACH=[
  {id:'future',e:'🚀',n:'Viajero del futuro',d:'Vive en el año 2080',t:()=>yearNow()>=2080},
  {id:'blackbelt',e:'🥋',n:'Cinturón negro',d:'Llega a cinturón negro en artes marciales',t:()=>(p.ma||0)>=90},
  {id:'defend',e:'🦸',n:'Defensa personal',d:'Defiéndete con éxito de 3 ataques',t:()=>(p.cnt.defend||0)>=3},
+ {id:'clean',e:'🌱',n:'Volver a empezar',d:'Supera una adicción grave'},
  {id:'bank',e:'🏦',n:'Golpe maestro',d:'Atraca un banco y sal impune'},
  {id:'influ',e:'📱',n:'Influencer',d:'Llega a 100.000 seguidores',t:()=>p.foll>=1e5},
  {id:'star',e:'🌟',n:'Celebridad',d:'Llega a 1 millón de seguidores',t:()=>p.foll>=1e6},
@@ -493,6 +494,7 @@ function ribbon(){
     [k>=3,'🏡','Familia','Dejaste una gran familia detrás.'],
     [p.age>=95,'🐢','Longevidad','Viste pasar casi un siglo.'],
     [p.karma>=15,'😇','Bondad','Hiciste del mundo un sitio mejor.'],
+    [Math.max(0,...Object.values(p.addict||{}))>=80,'🌀','Excesos','Las adicciones marcaron su vida.'],
     [(p.cnt.party||0)>=10,'🪩','Fiesta','No te perdiste ni una.'],
     [(p.cnt.countries||0)>=2,'🧳','Aventura','Viviste en varios países.'],
     [p.age<30,'🥀','Tragedia','Te fuiste demasiado pronto.'],
@@ -610,7 +612,7 @@ const EVENTS=[
   ['Aceptar',()=>{p.money+=30;st('sma',1);p.karma--;return 'Haces los deberes dos veces. Al menos aprendes algo.'}],
   ['Negarme',()=>'Le dices que se los haga él.']]},
  {min:12,max:17,txt:()=>'Unos chicos mayores te ofrecen un cigarrillo.',ch:[
-  ['Aceptarlo',()=>(st('hea',-5),'Toses como nunca. Aun así, repites.')],
+  ['Aceptarlo',()=>(st('hea',-5),addict('tobacco',12),'Toses como nunca. Aun así, repites.')],
   ['Rechazarlo',()=>(st('hea',1),'Te miran raro, pero te da igual.')]]},
  {min:13,max:17,txt:()=>'Te sale un grano enorme justo el día de la foto de clase.',ch:[
   ['Taparlo con maquillaje',()=>(st('loo',1),'Casi ni se nota en la foto.')],
@@ -843,6 +845,14 @@ const EVENTS=[
  {w:.4,min:18,max:120,cond:()=>p.biz.length>0,txt:()=>{EVB=pick(p.biz);EVB.offer=Math.round(EVB.v*(1.3+Math.random()*.5));return `Un inversor te ofrece ${fmt(EVB.offer)} por tu negocio (${EVB.n.toLowerCase()}).`},ch:[
   ['Venderlo',evb(b=>{p.biz.splice(p.biz.indexOf(b),1);p.money+=b.offer;return `Vendes por ${fmt(b.offer)}. ¡Buen negocio!`})],
   ['Rechazar la oferta',()=>'Le dices que no está en venta.']]},
+ // presión de grupo
+ {w:.5,min:15,max:40,txt:()=>'Un amigo te ofrece un porro en un parque.',ch:[
+  ['Aceptarlo',()=>VICES.find(v=>v.k==='vweed').fn()],
+  ['Decir que no',()=>'Le dices que no te va. Él se encoge de hombros.']]},
+ {w:.4,min:16,max:40,txt:()=>'En una fiesta, alguien saca unas pastillas y te ofrece una.',ch:[
+  ['Tomarla',()=>VICES.find(v=>v.k==='vpills').fn()],
+  ['Rechazarla',()=>'Dices que no y sigues bailando.'],
+  ['Irme de la fiesta',()=>(st('hap',-2),'Te vas a casa antes de tiempo.')]]},
  // caseros
  {min:18,max:120,cond:()=>p.assets.some(a=>a.rent),txt:()=>'Uno de tus inquilinos lleva meses sin pagar el alquiler.',ch:[
   ['Negociar un plan de pagos',()=>chance(.6)?'Acepta y empieza a pagar poco a poco.':'Promete pagar… y vuelve a no hacerlo.'],
@@ -1091,7 +1101,7 @@ const ACTS=[
  {k:'surg',e:'💄',n:'Cirugía estética',d:'Aspecto, con riesgo',min:18,cost:()=>5000,fn:()=>{if(chance(.12)){st('loo',-R(5,15));st('hap',-R(5,10));return 'La operación sale mal. No te reconoces en el espejo.'}st('loo',R(8,18));st('hap',R(2,6));return `El resultado es muy natural. Estás ${g('encantado','encantada')}.`}},
 ];
 const SOCIAL=[
- {k:'photo',e:'📸',n:'Publicar una foto',d:'Ganar seguidores',min:13,fn:()=>{const [n,v]=followGain(1);return v?`🔥 ¡Tu foto se hace viral! +${cfmt(n)} seguidores.`:`Tu foto gusta. +${cfmt(n)} seguidores.`}},
+ {k:'photo',e:'📸',n:'Publicar una foto',d:'Ganar seguidores',min:13,fn:()=>{addict('screens',2);const [n,v]=followGain(1);return v?`🔥 ¡Tu foto se hace viral! +${cfmt(n)} seguidores.`:`Tu foto gusta. +${cfmt(n)} seguidores.`}},
  {k:'video',e:'🎥',n:'Subir un vídeo',d:'Más alcance',min:13,fn:()=>{const [n,v]=followGain(2.5);st('sma',R(0,1));return v?`🔥 ¡Tu vídeo explota! +${cfmt(n)} seguidores.`:`Editas un vídeo majo. +${cfmt(n)} seguidores.`}},
  {k:'live',e:'🔴',n:'Hacer un directo',d:'Propinas del público',min:16,req:()=>p.foll>=1000?'':'Necesitas 1.000 seguidores',fn:()=>{const x=Math.round(p.foll*.002*R(1,5));p.money+=x;const [n]=followGain(1.5);return `Tres horas en directo. Te dejan ${fmt(x)} en propinas y ganas ${cfmt(n)} seguidores.`}},
  {k:'drama',e:'🔥',n:'Montar una polémica',d:'Todo o nada',min:16,fn:()=>{p.karma-=2;if(chance(.5)){const [n]=followGain(6);return `La lías y todo el mundo habla de ti. +${cfmt(n)} seguidores.`}p.foll=Math.round(p.foll*.75);st('hap',-6);return 'Te sale el tiro por la culata. Pierdes un cuarto de tus seguidores.'}},
@@ -1200,7 +1210,19 @@ const SPEND=[
  {k:'gdonate',e:'💝',n:'Donar a una ONG',d:'Karma y desgrava',min:16,special:()=>donate()},
  {k:'grenov',e:'🛠️',n:'Reformar tu casa',d:'Sube su valor',min:18,cost:()=>15000,req:()=>p.assets.some(a=>a.k==='house')?'':'Necesitas una casa',fn:()=>{const h=p.assets.find(a=>a.k==='house');const up=15000*(.8+Math.random()*.9);h.v+=up;st('hap',5);return `Reformas tu casa: ${h.n.toLowerCase()}. Ahora vale ${fmt(h.v)}.`}},
 ];
-const LISTS={a:ACTS,s:SOCIAL,c:CRIMES,j:JAIL_ACTS,m:MOB_ACTS,h:HUSTLE,o:OUTDOOR,sp:SPORT_ACTS,g:SPEND};
+const ADD={gamble:['🎰','juego','al juego'],alcohol:['🍷','alcohol','al alcohol'],tobacco:['🚬','tabaco','al tabaco'],weed:['🌿','cannabis','al cannabis'],
+  pills:['💊','pastillas','a las pastillas'],hard:['❄️','drogas duras','a las drogas duras'],screens:['📱','pantallas','a las pantallas']};
+function possession(what){p.record++;if((p.addict.hard||0)>=40&&p.record>1)return goJail(1,`posesión de ${what}`);
+  const f=R(300,1500);if(!pay(f))p.debt+=f;return `👮 La policía te pilla con ${what} encima. Multa de ${fmt(f)} y antecedentes.`}
+const VICES=[
+ {k:'vsmoke',e:'🚬',n:'Fumar un cigarrillo',d:'Engancha muchísimo',min:14,cost:()=>5,fn:()=>{addict('tobacco',R(6,12));addStress(-3);st('hea',-1);return pick(['Te calma los nervios… un rato.','Toses un poco, pero te lo acabas.'])}},
+ {k:'vweed',e:'🌿',n:'Fumar cannabis',d:'Te relaja y te atonta',min:16,cost:()=>15,fn:()=>{addict('weed',R(5,10));addStress(-6);st('sma',-R(0,2));st('hap',R(1,4));if(chance(.06))return possession('cannabis');return pick(['Te ríes de todo durante una hora.','Te entra un hambre feroz.'])}},
+ {k:'vpills',e:'💊',n:'Tomar pastillas sin receta',d:'Muy adictivo',min:16,cost:()=>40,fn:()=>{addict('pills',R(8,15));addStress(-8);st('hea',-R(1,4));if(chance(.04)){st('hea',-R(15,35));return '🚑 Te sientan fatal y acabas en urgencias.'}return 'Te sientes en las nubes unas horas. Luego, el bajón.'}},
+ {k:'vhard',e:'❄️',n:'Consumir drogas duras',d:'Peligroso de verdad',min:18,cost:()=>100,fn:()=>{addict('hard',R(12,22));st('hap',R(3,8));st('hea',-R(3,8));
+   if(chance(.05+(p.addict.hard||0)/500)){st('hea',-R(30,60));return '🚑 Sufres una sobredosis. Te salvan de milagro en urgencias.'}
+   if(chance(.08))return possession('drogas');return 'Una euforia intensa… y un bajón terrible al día siguiente.'}},
+];
+const LISTS={a:ACTS,s:SOCIAL,c:CRIMES,j:JAIL_ACTS,m:MOB_ACTS,h:HUSTLE,o:OUTDOOR,sp:SPORT_ACTS,g:SPEND,v:VICES};
 function costOf(a){return a.cost?a.cost():0}
 const limOf=a=>a.limit||LIMITS[a.k]||PER_YEAR;
 function whyNot(a){return p.age<(a.min||0)?`Desde los ${a.min} años`:used(a.k)>=limOf(a)?`Ya van ${limOf(a)} este año`:(a.req&&a.req())||''}
@@ -1585,7 +1607,7 @@ const ALL_LANGS=[...new Set(Object.values(LANG))];
 const speaks=l=>(p.langs?.[l]||0)>=50;
 function addStress(d){p.stress=clamp(Math.round((p.stress||0)+d),0,100)}
 function addict(k,d){p.addict=p.addict||{};const b=p.addict[k]||0;p.addict[k]=clamp(b+d,0,100);
-  if(b<60&&p.addict[k]>=60)L(k==='gamble'?'⚠️ Te estás enganchando al juego.':'⚠️ Estás bebiendo demasiado. Empieza a ser un problema.','bad')}
+  if(b<60&&p.addict[k]>=60)L(`⚠️ ${ADD[k]?.[0]||''} Te has enganchado ${ADD[k]?.[2]||k}. Empieza a ser un problema serio.`,'bad')}
 function finishLife(q,o){
   q.traits=o.traits?.length?[...new Set(o.traits)]:rollTraits(o.inherit);
   if(o.kidSt)for(const k of ['sma','hea','loo','hap'])if(o.kidSt[k]!=null)q.s[k]=clamp(Math.round(o.kidSt[k]),0,100);
@@ -1636,6 +1658,27 @@ function yearLife(a){
   const A=p.addict||(p.addict={});
   if((A.gamble||0)>=60&&p.money>0){const x=Math.min(p.money,R(500,5000)*W());p.money-=x;L(`🎰 Tu adicción al juego te cuesta ${fmt(x)} este año.`,'bad')}
   if((A.alcohol||0)>=60){st('hea',-R(3,8));st('hap',-3);L('🍷 Bebes demasiado y tu salud se resiente.','bad')}
+  const vcost=c=>{c*=W();if(!pay(c))p.debt+=c;return c};
+  if((A.tobacco||0)>=60){const c=vcost(600);st('hea',-R(1,3));L(`🚬 Fumas un paquete al día: ${fmt(c)} al año, y tu salud se resiente.`,'bad')}
+  if((A.weed||0)>=60){const c=vcost(800);st('sma',-R(1,3));if(p.job&&!p.job.pt)p.job.perf=clamp(p.job.perf-4,0,100);L(`🌿 Fumas cannabis a diario (${fmt(c)} al año). Te cuesta concentrarte.`,'bad')}
+  if((A.pills||0)>=60){const c=vcost(1500);st('hea',-R(3,8));if(p.job&&!p.job.pt)p.job.perf=clamp(p.job.perf-8,0,100);L(`💊 Dependes de las pastillas para todo: ${fmt(c)} al año.`,'bad')}
+  if((A.hard||0)>=60){const c=vcost(6000);st('hea',-R(6,14));st('hap',-R(3,8));
+    p.rels.filter(r=>r.alive&&['parent','spouse','partner','child','sibling'].includes(r.role)).forEach(r=>r.bond=clamp(r.bond-6,0,100));
+    if(p.job&&!p.job.pt){p.job.perf=clamp(p.job.perf-15,0,100);if(chance(.2)){p.job=null;L('Te despiden por tu adicción.','bad')}}
+    L(`❄️ Tu adicción a las drogas duras te cuesta ${fmt(c)} este año y está destrozando tu vida y la de los tuyos.`,'bad')}
+  if((A.screens||0)>=60){addStress(4);st('sma',-1);L('📱 Pasas más de diez horas al día pegado a la pantalla.','bad')}
+  const subs=['tobacco','weed','pills','hard','alcohol','gamble'].filter(k=>(A[k]||0)>=60);
+  if(subs.length&&!p.jail&&chance(.35)){const k=pick(subs),[e,n]=ADD[k];
+    special(`${e} Mono de ${n}`,`Llevas días sin poder pensar en otra cosa que en ${n==='juego'?'apostar':n}.`,[
+      ['Ceder',()=>{addict(k,5);addStress(-5);return 'Cedes. El alivio dura poco.'}],
+      ['Resistir',()=>{A[k]=Math.max(0,A[k]-R(6,12));addStress(8);st('hap',-3);return 'Lo pasas fatal, pero aguantas. Un día más.'}],
+      ['Pedir ayuda a alguien cercano',()=>{const r=partner()||parents()[0]||p.rels.find(x=>x.alive&&x.role==='friend');if(!r)return 'No tienes a nadie a quien llamar. Lo pasas solo.';
+        r.bond=clamp(r.bond+5,0,100);A[k]=Math.max(0,A[k]-R(8,15));return `Llamas a ${r.first}. Te acompaña toda la noche.`}]])}
+  const worst=Math.max(0,...Object.values(A));
+  if(worst>=70&&!p.jail&&chance(.15)&&p.rels.some(r=>r.alive&&['parent','spouse','partner','child','sibling'].includes(r.role)))
+    special('🫂 Intervención familiar','Tu familia se reúne contigo. Están muy preocupados por tus adicciones y te piden que te dejes ayudar.',[
+      ['Aceptar ir a rehabilitación',()=>{if(chance(.6)){if(worst>=60)grant('clean');for(const k in A)A[k]=0;st('hap',10);return '🏥 Te pagan la rehabilitación y la terminas. Empiezas de cero.'}for(const k in A)A[k]=Math.max(0,A[k]-25);return '🏥 Recaes a mitad del programa, pero algo has avanzado.'}],
+      ['Negarme',()=>{p.rels.filter(r=>r.alive&&['parent','spouse','partner','child','sibling'].includes(r.role)).forEach(r=>r.bond=clamp(r.bond-10,0,100));return 'Te vas dando un portazo. Tu familia se queda llorando.'}]]);
   for(const k in A)A[k]=Math.max(0,A[k]-3);
   const nl=langOf(p.c);p.langs=p.langs||{};
   if((p.langs[nl]||0)<100){const b=p.langs[nl]||0;p.langs[nl]=Math.min(100,b+R(4,10));if(b<50&&p.langs[nl]>=50)L(`🗣️ A base de vivir aquí, ya hablas ${nl.toLowerCase()} con soltura.`,'good')}
@@ -1690,9 +1733,10 @@ X.hob=(a,k)=>{const x=HOBBIES.find(h=>h.k===k);if(!x)return;p.hob=p.hob||{};cons
 };
 X.mind=a=>{
   if(a==='therapy'){const c=80*W();if(!pay(c))return result(`La sesión cuesta ${fmt(c)}.`);use('mther');addStress(-R(10,20));st('hap',R(2,5));return done(pick(['🛋️ Hablas de tu infancia durante una hora. Sales más ligero.','🛋️ Tu terapeuta te enseña a respirar cuando te agobias.']))}
+  if(a==='patch'){if(!pay(150))return result(`Los parches cuestan ${fmt(150)}.`);use('mpatch');p.addict.tobacco=Math.max(0,(p.addict.tobacco||0)-R(15,30));return done(`🚭 Usas parches de nicotina. Tu adicción al tabaco baja a ${p.addict.tobacco}/100.`)}
   if(a==='unplug'){use('munplug');addStress(-R(5,10));return done('📵 Un fin de semana sin móvil. Al principio cuesta; luego es maravilloso.')}
   if(a==='group'){use('mgroup');for(const k in p.addict)p.addict[k]=Math.max(0,p.addict[k]-R(5,12));return done('🤝 Vas a un grupo de apoyo. Escuchar a otros te ayuda mucho.')}
-  if(a==='rehab'){const c=3000*W();if(!pay(c))return result(`Cuesta ${fmt(c)}.`);use('mrehab');if(chance(.6)){for(const k in p.addict)p.addict[k]=0;st('hap',8);return done('🏥 Completas el programa de rehabilitación. Empiezas de nuevo con fuerzas.')}
+  if(a==='rehab'){const c=3000*W();if(!pay(c))return result(`Cuesta ${fmt(c)}.`);use('mrehab');if(chance(.6)){if(Math.max(0,...Object.values(p.addict))>=60)grant('clean');for(const k in p.addict)p.addict[k]=0;st('hap',8);return done('🏥 Completas el programa de rehabilitación. Empiezas de nuevo con fuerzas.')}
     for(const k in p.addict)p.addict[k]=Math.max(0,p.addict[k]-20);return done('🏥 Recaes a mitad del programa, pero algo has avanzado.')}
   if(a==='affair'){const pt=partner();if(!pt)return;use('maffair');p.karma-=4;
     if(chance(.4)){pt.bond-=50;st('hap',-10);if(pt.bond<20){pt.role='ex';p.rels=p.rels.filter(x=>x!==pt);return done(`💔 ${pt.first} descubre tu aventura y te deja.`)}return done(`💔 ${pt.first} descubre tu aventura. La relación queda muy tocada.`)}
@@ -1823,8 +1867,8 @@ function slotsMenu(){const map={x:closeModal};let h='';
 function renderMore(){let h='';
   if(p.age>=6)h+=`<h3>🎨 Aficiones</h3>`+HOBBIES.map(x=>{const lv=p.hob?.[x.k]||0;return `<div class="row"><div><b>${x.e} ${x.n}</b><small>Nivel ${lv}/100</small></div><div class="btns">${btn('hob','practice:'+x.k,'Practicar',full('hb'+x.k))}${btn('hob','contest:'+x.k,'🏆 Concurso',lv<40||full('hc'+x.k),1)}</div></div>`}).join('');
   if(p.age>=12){const A=p.addict||{},worst=Math.max(0,...Object.values(A));
-    h+=banner('🧠 Mente y salud',`Estrés ${p.stress||0}/100${(A.gamble||0)>=20?` · juego ${A.gamble}/100`:''}${(A.alcohol||0)>=20?` · alcohol ${A.alcohol}/100`:''}`,
-      btn('mind','therapy',`🛋️ Terapia (${fmt(80*W())})`,full('mther'))+btn('mind','unplug','📵 Desconectar',full('munplug'),1)+(worst>=20?btn('mind','group','🤝 Grupo de apoyo',full('mgroup'),1)+btn('mind','rehab',`🏥 Rehabilitación (${fmt(3000*W())})`,full('mrehab'),1):''))}
+    h+=banner('🧠 Mente y salud',`Estrés ${p.stress||0}/100${Object.entries(A).filter(([k,v])=>v>=20&&ADD[k]).map(([k,v])=>` · ${ADD[k][0]} ${ADD[k][1]} ${v}/100${v>=60?' (adicción)':''}`).join('')}`,
+      btn('mind','therapy',`🛋️ Terapia (${fmt(80*W())})`,full('mther'))+btn('mind','unplug','📵 Desconectar',full('munplug'),1)+((A.tobacco||0)>=20?btn('mind','patch',`🚭 Parches para dejar de fumar (${fmt(150)})`,full('mpatch'),1):'')+(worst>=20?btn('mind','group','🤝 Grupo de apoyo',full('mgroup'),1)+btn('mind','rehab',`🏥 Rehabilitación (${fmt(3000*W())})`,full('mrehab'),1):''))}
   if(p.age>=18){const ins=INS[p.ins||0];h+=banner('🏥 Seguro y salud',`Seguro: ${ins.n.toLowerCase()}${ins.c?` (${fmt(ins.c*W())} al año)`:''} · ${p.chronic?.length?`Enfermedades crónicas: ${p.chronic.join(', ')}`+` · 💊 tratamiento automático: ${fmt(treatCost())} al año`:'sin enfermedades crónicas'}`,
     btn('health','ins','📄 Cambiar de seguro'))}
   if(p.age>=14)h+=banner('📺 Concurso de preguntas','Minijuego: responde 5 preguntas en la tele. Cuantas más aciertes, más ganas.',btn('learn','tv','Participar (1 al año)',used('tv')>=1));
@@ -2273,7 +2317,10 @@ function jobRisk(){const j=p.job;if(!j||p.jail)return null;
   const r=RISKY[j.t[0]];return r?[r[0],r[1],'Fue un accidente laboral.']:null}
 function illCause(){const A=p.addict||{};
   if(p.vamp)return ['la luz del sol','Salió de casa a plena luz del día sin protegerse.'];
+  if((A.hard||0)>=60)return ['una sobredosis','Llevaba tiempo enganchado a las drogas duras.'];
+  if((A.pills||0)>=60)return ['una intoxicación por pastillas','Dependía de ellas desde hacía años.'];
   if((A.alcohol||0)>=60)return ['una cirrosis hepática','Llevaba años bebiendo demasiado.'];
+  if((A.tobacco||0)>=60&&p.age>=40)return ['un cáncer de pulmón','Fumó durante muchos años.'];
   if(p.sick)return [`complicaciones de ${p.sick}`,'Nunca llegó a curarse del todo.'];
   if(p.chronic?.length)return [`complicaciones de su ${pick(p.chronic)}`,'Su salud llevaba tiempo deteriorándose.'];
   if((p.stress||0)>80)return ['un infarto','El estrés acumulado durante años acabó pasándole factura.'];
@@ -2454,6 +2501,7 @@ function renderActs(){
   let h=`<h3>🎯 Actividades</h3>${cards('a')}<h3>⚽ Deporte</h3>${renderMA()}<div style="margin-top:10px">${cards('sp')}</div><h3>💸 Gastos y caprichos</h3>${cards('g')}`;
   if(p.age>=13&&yearNow()>=2004)h+=`<h3>📱 Redes sociales</h3><p class="note">${cfmt(p.foll)} seguidores · fama ${fame()}/100${p.monet?' · 💸 monetizado':''}</p>${cards('s')}`;
   if(p.age>=12)h+=`<h3>🚔 Crimen</h3><p class="note">Puede salir bien… o acabar entre rejas. Antecedentes: ${p.record}${p.fugitive?' · ahora mismo te busca la policía':''}.</p>${cards('c','risk')}`+(p.age>=16?`<div class="btns" style="margin-top:8px">${btn('murder','pick','☠️ Cometer un asesinato',full('cmurder'),1)}</div>`:'');
+  if(p.age>=14)h+=`<h3>🧪 Vicios</h3><p class="note">Te alivian un rato, pero enganchan. Si te haces adicto, cada año te costarán dinero, salud y relaciones. Para salir: grupo de apoyo, parches o rehabilitación en 🧠 Mente y salud.</p>${cards('v','risk')}`;
   if(p.age>=18){
     if(p.mob){const m=p.mob,o=MOBS[m.i];
       h+=`<h3>🕴️ ${o.e} ${o.n}</h3><p class="note">Rango: ${rankName(m.rank)} · ${m.yrs} ${m.yrs===1?'año':'años'} dentro${m.rank<5?` · ${rankName(m.rank+1).toLowerCase()} con ${MOB_NEED[m.rank+1]} de respeto`:''}</p>${bar('🎖️ Respeto',m.resp)}${barR('🚨 Atención policial',m.heat)}<div style="margin-top:10px">${cards('m','risk')}</div>`;
