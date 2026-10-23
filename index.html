@@ -938,8 +938,8 @@ function ageUp(){
   for(const r of p.rels){
     if(!r.alive||r.role==='ex')continue;
     r.age++;r.bond=clamp(r.bond-R(0,3),0,100);
-    const d=r.vamp?0:r.age<60?.002:Math.pow((r.age-55)/45,3)*.6;
-    if(chance(d)){r.alive=false;L(`${label(r)}: ${r.first} fallece a los ${r.age} años.`,'bad');st('hap',-(['parent','spouse','child'].includes(r.role)?R(12,25):R(4,10)));continue}
+    const d=r.vamp?0:r.age<18?.0005:r.age<60?.002:Math.pow((r.age-55)/45,3)*.6;
+    if(chance(d)){r.alive=false;r.cause=relCause(r);L(`${label(r)}: ${r.first} fallece a los ${r.age} años por ${r.cause}.`,'bad');st('hap',-(['parent','spouse','child'].includes(r.role)?R(12,25):R(4,10)));continue}
     if(r.role==='partner'&&r.bond<20&&chance(.4)){r.role='ex';L(`💔 ${r.first} te deja. Dice que ya no siente lo mismo.`,'bad');st('hap',-10)}
     if(r.role==='child'&&r.age===18)L(`${r.first} cumple 18 y se va a vivir por su cuenta.`);
   }
@@ -1050,9 +1050,12 @@ function ageUp(){
   if(p.sick){if(a<18){L(`🙂 Tus padres te llevan al médico y te curas de ${p.sick}.`);p.sick=null}else if(chance(.4)){L(`🙂 Te recuperas poco a poco de ${p.sick}.`);p.sick=null}else{st('hea',-R(2,6));L(`🤒 Sigues con ${p.sick}. Deberías ir al médico.`,'bad')}}
   else if(chance((a>50?.1:.04)*(has('healthy')?.4:1))){p.sick=pick(['una gripe muy fuerte','bronquitis','migrañas crónicas','una infección de oído','anemia']);st('hea',-R(3,8));L(`🤒 Te diagnostican ${p.sick}.`,'bad')}
   // muerte
+  const jr=jobRisk(),mobR=p.mob&&!p.jail?.003+p.mob.rank*.001:0;
   const dc=p.vamp?0:a<50?.0008:Math.pow((a-50)/50,3)*(1.4-p.s.hea/100);
-  if(p.s.hea<=0)die(pick(['una insuficiencia cardíaca','complicaciones de salud']));
-  else if(chance(dc))die(a<50?pick(['un accidente de tráfico','un accidente doméstico']):pick(['causas naturales, mientras dormía','un infarto','una neumonía','un ictus']));
+  if(p.s.hea<=0)die(...illCause());
+  else if(jr&&chance(jr[0]))die(jr[1],jr[2]);
+  else if(mobR&&chance(mobR))die('un ajuste de cuentas de una banda rival',`Era ${rankName(p.mob.rank).toLowerCase()} en ${MOBS[p.mob.i].n}.`);
+  else if(chance(dc))die(...(a<50?accidentCause():ageCause()));
   if(p.alive){
     if(p.job&&!p.job.pt&&!p.job.sport&&a>=65&&(a-65)%3===0)special('🏖️ Jubilación',`Te ofrecen la jubilación. Cobrarías ${fmt(p.job.sal*.6)} al año.`,[['Jubilarme',()=>retire()],['Seguir trabajando',()=>'Todavía te queda cuerda.']],()=>!!p.job&&!p.job.pt);
     if(a>=2&&chance(.7)){const e=randomEvent();if(e)pushEvent(e)}
@@ -1061,12 +1064,12 @@ function ageUp(){
   if(tab!=='vida')setTab('vida');
   if(queue.length)runQueue();
 }
-function die(cause){
-  p.alive=false;p.cause=cause;
+function die(cause,why){
+  p.alive=false;p.cause=cause;p.causeWhy=why||'';
   if(p.age<30)grant('young');
   const [e,n,d]=ribbon();p.ribbon=[e,n,d];
   S.ribbons[`${e} ${n}`]=(S.ribbons[`${e} ${n}`]||0)+1;
-  L(`🕊️ Mueres a los ${p.age} años por ${cause}.`,'bad');
+  L(`🕊️ Mueres a los ${p.age} años por ${cause}.${why?' '+why:''}`,'bad');
   S.cemetery.push({n:`${p.first} ${p.last}`,age:p.age,cause,rib:e});
   submitHall();sfx('death');
   queue.length=0;queue.push({death:true});
@@ -1903,7 +1906,7 @@ function storyText(){
   lines.push((sp?`Se casó con ${sp.first}`:(p.cnt.weds?'Se casó alguna vez':'Nunca se casó'))+(kids?` y tuvo ${kids} ${kids===1?'hijo':'hijos'}.`:'.'));
   if(p.foll>=1000)lines.push(`Llegó a tener ${cfmt(p.foll)} seguidores.`);
   if(p.record)lines.push(`Acumuló ${p.record} ${p.record===1?'antecedente':'antecedentes'} penales.`);
-  lines.push(`Murió a los ${p.age} años en ${c}, por ${p.cause}.`,`Su cinta: ${rb[0]} ${rb[1]}. ${rb[2]}`);
+  lines.push(`Murió a los ${p.age} años en ${c}, por ${p.cause}.${p.causeWhy?' '+p.causeWhy:''}`,`Su cinta: ${rb[0]} ${rb[1]}. ${rb[2]}`);
   const items=[];for(const e of p.log)for(const l of e.lines)if(l.tone==='good'||l.tone==='bad')items.push(`· A los ${e.age}: ${l.t}`);
   const step=Math.max(1,Math.ceil(items.length/8));const hi=items.filter((x,i)=>i%step===0).slice(0,8);
   if(hi.length)lines.push('','Momentos de su vida:',...hi);
@@ -2257,9 +2260,48 @@ function taxDetail(){const lt=p.lastTax;if(!lt||!lt.parts)return '';const pr=lt.
     <p class="note">Tu tramo más alto es el ${Math.round(m*100)} %: de cada ${fmt(1000)} más que ganes, ${fmt(1000*m)} se van en impuestos.</p>`
     +(lt.items?.length?`<p class="eyebrow" style="margin-top:10px!important">Impuesto de cada propiedad</p>`+lt.items.slice(0,10).map(x=>`<div class="row"><div><b>${x.e} ${esc(x.n)}</b></div><b>${fmt(x.t)}/año</b></div>`).join(''):'')}
 
+/* ---------- causas de muerte con explicación ---------- */
+const RISKY={'Policía':[.003,'un tiroteo durante una persecución policial'],'Bombero':[.003,'el derrumbe de un edificio en llamas durante un rescate'],
+  'Electricista':[.002,'una descarga eléctrica mientras trabajaba'],'Mecánico':[.0015,'un coche que se le cayó encima en el taller'],
+  'Repartidor':[.002,'un accidente con la moto de reparto'],'Piloto de avión':[.002,'un accidente de avión'],'Cocinero':[.0005,'un incendio en la cocina del restaurante']};
+function jobRisk(){const j=p.job;if(!j||p.jail)return null;
+  if(j.mil)return [.004,'una misión militar en el extranjero','Murió en acto de servicio.'];
+  if(j.agent)return [.004,'una misión secreta que salió mal','Su familia nunca supo los detalles.'];
+  if(j.astro)return [.002,'un fallo en la nave durante una misión espacial','Su nombre quedó grabado en la historia.'];
+  if(j.sport==='Automovilismo'||j.sport==='Motociclismo')return [.005,`un accidente en plena carrera de ${j.sport.toLowerCase()}`,'Ocurrió en una curva a más de 250 km/h.'];
+  if(j.sport==='Boxeo'||j.sport==='Artes marciales mixtas')return [.002,'un golpe en la cabeza durante un combate','Se desplomó en mitad del combate.'];
+  const r=RISKY[j.t[0]];return r?[r[0],r[1],'Fue un accidente laboral.']:null}
+function illCause(){const A=p.addict||{};
+  if(p.vamp)return ['la luz del sol','Salió de casa a plena luz del día sin protegerse.'];
+  if((A.alcohol||0)>=60)return ['una cirrosis hepática','Llevaba años bebiendo demasiado.'];
+  if(p.sick)return [`complicaciones de ${p.sick}`,'Nunca llegó a curarse del todo.'];
+  if(p.chronic?.length)return [`complicaciones de su ${pick(p.chronic)}`,'Su salud llevaba tiempo deteriorándose.'];
+  if((p.stress||0)>80)return ['un infarto','El estrés acumulado durante años acabó pasándole factura.'];
+  if(p.jail)return ['una pelea en el patio de la cárcel','Recibió una paliza de la que no se recuperó.'];
+  if(p.age>=70)return [pick(['un fallo cardíaco','una insuficiencia renal','una neumonía']),'Su cuerpo, ya muy débil, no aguantó más.'];
+  return [pick(['una infección grave','una enfermedad del corazón','un cáncer']),'Su salud se fue deteriorando sin que se detectara a tiempo.']}
+function accidentCause(){const o=[],own=k=>p.assets.some(a=>a.k===k);
+  if(own('car')||p.license)o.push(['un accidente de tráfico',pick(['Un camión se saltó un semáforo en rojo.','Perdió el control del coche en una curva mojada.','Un conductor borracho invadió su carril.'])]);
+  if(own('moto'))o.push(['un accidente de moto','Derrapó en una curva con gravilla.']);
+  if(own('boat'))o.push(['un naufragio','Una tormenta le sorprendió en alta mar.']);
+  if(own('plane'))o.push(['un accidente de avioneta','El motor falló poco después de despegar.']);
+  if((p.cnt.party||0)>=5)o.push(['una intoxicación etílica','Bebió demasiado en una fiesta.']);
+  if((p.ma||0)<10&&p.age>=16&&!p.jail)o.push(['un atraco que salió mal','Se resistió a un ladrón armado.']);
+  if(p.age<14)o.push(['un accidente en el parque','Se cayó desde lo alto de un tobogán.'],['una meningitis','La infección avanzó muy deprisa.']);
+  o.push(['un accidente doméstico',pick(['Se cayó por las escaleras de casa.','Una fuga de gas en la cocina.','Resbaló en la ducha y se golpeó la cabeza.'])],
+    ['un atropello','Un coche no frenó en un paso de peatones.'],['un infarto fulminante','Tenía un problema de corazón que nadie había detectado.'],['un aneurisma','Fue algo repentino, sin ningún aviso.']);
+  return pick(o)}
+function ageCause(){return pick([['causas naturales','Se fue tranquilamente mientras dormía.'],['un infarto','Le dio mientras paseaba por el parque.'],['una neumonía','Un resfriado se complicó en pleno invierno.'],
+  ['un ictus','Ocurrió de repente, mientras cenaba.'],['un cáncer','Luchó durante meses contra la enfermedad.'],['alzhéimer avanzado','Llevaba años sin reconocer a casi nadie.'],['una caída en casa','Se rompió la cadera y no se recuperó de la operación.']])}
+function relCause(r){
+  if(r.age>=60)return pick(['causas naturales','un infarto','una neumonía','un ictus','un cáncer','alzhéimer avanzado','una caída en casa']);
+  if(r.age<18)return pick(['una enfermedad grave','un accidente de tráfico','una meningitis']);
+  const j=r.job&&RISKY[r.job.t[0]];if(j&&chance(.5))return j[1];
+  return pick(['un accidente de tráfico','un cáncer','un infarto fulminante','un accidente laboral','un aneurisma','un atropello'])}
+
 /* ---------- gente ---------- */
 function relMenu(r){
-  if(!r.alive)return result(`🕊️ ${r.first} falleció a los ${r.age} años. Le echas de menos.`);
+  if(!r.alive)return result(`🕊️ ${r.first} falleció a los ${r.age} años${r.cause?` por ${r.cause}`:''}. Le echas de menos.`);
   const pt=r.role==='partner'||r.role==='spouse';
   const bio=p.sex!==r.sex&&(p.sex==='F'?p.age:r.age)<=45;
   const acts=[['time',p.jail?'Pedirle que venga a visitarte':'Pasar tiempo juntos'],['talk','Conversar']];
@@ -2372,7 +2414,7 @@ function showDeath(){
   const map={new:newLifeForm,revive:()=>{p.alive=true;p.s.hea=60;p.sick=null;queue.length=0;L('✨ Resucitas gracias al modo libre. Nadie se lo explica.','good');save();render();closeModal()}};
   kids.forEach(k=>map['k'+k.id]=()=>continueAs(k));
   map.story=()=>copyText(storyText(),'📖 La historia de tu vida','Cópiala y compártela donde quieras.',showDeath);
-  openModal(`<div class="avatar big" aria-hidden="true">${avatarSVG(p)}</div><p class="eyebrow">🕊️ Descanse en paz</p><h2>${p.first} ${p.last}</h2><p class="muted">${p.age} años · ${COUNTRIES[p.c].n}</p><p>Murió por ${p.cause}.</p>
+  openModal(`<div class="avatar big" aria-hidden="true">${avatarSVG(p)}</div><p class="eyebrow">🕊️ Descanse en paz</p><h2>${p.first} ${p.last}</h2><p class="muted">${p.age} años · ${COUNTRIES[p.c].n}</p><p>Murió por ${p.cause}.${p.causeWhy?` ${p.causeWhy}`:''}</p>
     <div class="banner"><p class="eyebrow">Cinta de esta vida</p><b>${rb[0]} ${rb[1]}</b><p class="muted" style="margin:2px 0 0">${rb[2]}</p></div>
     <dl class="sum" style="margin-top:12px"><dt>🎓 Estudios</dt><dd>${edu}</dd><dt>💎 Patrimonio</dt><dd>${fmt(worth())}</dd><dt>👶 Hijos</dt><dd>${p.rels.filter(r=>r.role==='child').length}</dd><dt>📱 Seguidores</dt><dd>${cfmt(p.foll)}</dd><dt>🚔 Antecedentes</dt><dd>${p.record}</dd><dt>⚖️ Fama</dt><dd>${verdict}</dd><dt>🪦 Vidas jugadas</dt><dd>${S.cemetery.length}</dd></dl>
     ${timeline()}<div class="choices">${kids.map(k=>`<button class="btn" data-k="k${k.id}">🧬 Seguir como ${k.first} (${k.age} años)</button>`).join('')}
