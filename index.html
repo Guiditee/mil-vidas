@@ -1801,8 +1801,8 @@ function renderMore(){let h='';
   if(p.age>=12){const A=p.addict||{},worst=Math.max(0,...Object.values(A));
     h+=banner('🧠 Mente y salud',`Estrés ${p.stress||0}/100${(A.gamble||0)>=20?` · juego ${A.gamble}/100`:''}${(A.alcohol||0)>=20?` · alcohol ${A.alcohol}/100`:''}`,
       btn('mind','therapy',`🛋️ Terapia (${fmt(80*W())})`,full('mther'))+btn('mind','unplug','📵 Desconectar',full('munplug'),1)+(worst>=20?btn('mind','group','🤝 Grupo de apoyo',full('mgroup'),1)+btn('mind','rehab',`🏥 Rehabilitación (${fmt(3000*W())})`,full('mrehab'),1):''))}
-  if(p.age>=18){const ins=INS[p.ins||0];h+=banner('🏥 Seguro y salud',`Seguro: ${ins.n.toLowerCase()}${ins.c?` (${fmt(ins.c*W())} al año)`:''} · ${p.chronic?.length?`Enfermedades crónicas: ${p.chronic.join(', ')}${p.treated===p.age?' (en tratamiento)':''}`:'sin enfermedades crónicas'}`,
-    btn('health','ins','📄 Cambiar de seguro')+(p.chronic?.length?btn('health','treat',`💊 Tratamiento (${fmt(1200*W()*(1-ins.cov))})`,p.treated===p.age,1):''))}
+  if(p.age>=18){const ins=INS[p.ins||0];h+=banner('🏥 Seguro y salud',`Seguro: ${ins.n.toLowerCase()}${ins.c?` (${fmt(ins.c*W())} al año)`:''} · ${p.chronic?.length?`Enfermedades crónicas: ${p.chronic.join(', ')}`+` · 💊 tratamiento automático: ${fmt(treatCost())} al año`:'sin enfermedades crónicas'}`,
+    btn('health','ins','📄 Cambiar de seguro'))}
   if(p.age>=14)h+=banner('📺 Concurso de preguntas','Minijuego: responde 5 preguntas en la tele. Cuantas más aciertes, más ganas.',btn('learn','tv','Participar (1 al año)',used('tv')>=1));
   if(p.age>=18&&partner())h+=banner('💋 Tentaciones','Una aventura a escondidas. Si te pillan, adiós relación.',btn('mind','affair','Tener una aventura',full('maffair'),1));
   return h}
@@ -1923,12 +1923,16 @@ function mainMenu(){
 
 const INS=[{n:'Sin seguro',c:0,cov:0},{n:'Básico',c:600,cov:.5},{n:'Completo',c:1800,cov:.9}];
 const CHRONIC=['diabetes','hipertensión','asma','artritis','colesterol alto'];
+const treatCost=()=>1200*W()*(1-INS[p.ins||0].cov)*Math.max(1,(p.chronic||[]).length*.7);
 function healthYear(a){
   const ins=INS[p.ins||0];
   if(ins.c&&a>=18&&!p.jail){const c=ins.c*W();if(p.money>=c){p.money-=c;L(`📄 Pagas ${fmt(c)} de seguro médico (${ins.n.toLowerCase()}).`,'money')}else{p.ins=0;L('📄 No puedes pagar el seguro médico y te dan de baja.','bad')}}
   p.chronic=p.chronic||[];
-  if(p.chronic.length&&p.treated!==a-1){st('hea',-R(0,2)*p.chronic.length);L(`💊 Sin tratamiento, tu ${p.chronic.join(' y tu ')} empeora${p.chronic.length>1?'n':''}.`,'bad')}
   if(a>=35&&chance(.03*(has('healthy')?.4:1))){const nc=CHRONIC.filter(x=>!p.chronic.includes(x));if(nc.length){const d=pick(nc);p.chronic.push(d);L(`🩺 Te diagnostican ${d}. Es una enfermedad crónica: necesitarás tratamiento cada año.`,'bad')}}
+  if(p.chronic.length){const c=p.jail?0:treatCost();p.treated=a;st('hea',R(0,1));
+    if(!c)L(`💊 En prisión te dan el tratamiento de tu ${p.chronic.join(' y tu ')} sin coste.`);
+    else if(pay(c))L(`💊 Tratamiento anual de tu ${p.chronic.join(' y tu ')}: ${fmt(c)}${ins.cov?' (con descuento del seguro)':''}.`,'money');
+    else{p.debt+=c;L(`💊 No te llega para el tratamiento de tu ${p.chronic.join(' y tu ')}: ${fmt(c)} pasan a deuda.`,'bad')}}
   if(p.s.hea<35&&a>=25&&!p.jail&&chance(.3)){const cost=20000*W()*(1-ins.cov);
     special('🏥 Operación',`Los médicos recomiendan operarte. Te costaría ${fmt(cost)}${ins.cov?' con tu seguro':''}.`,[
       ['Operarme',()=>{if(!pay(cost))p.debt+=cost;if(chance(.85)){st('hea',R(20,40));return '🏥 La operación sale bien. Te recuperas poco a poco.'}st('hea',-R(5,15));return '🏥 Hay complicaciones, pero sales adelante.'}],
@@ -1937,7 +1941,6 @@ function healthYear(a){
 X.health=a=>{const ins=INS[p.ins||0];
   if(a==='ins'){const map={};INS.forEach((x,i)=>map['i'+i]=()=>{p.ins=i;save();render();result(`📄 Ahora tienes: ${x.n.toLowerCase()}.`)});
     return openModal(`<p class="eyebrow">📄 Seguro médico</p><h2>¿Qué seguro quieres?</h2><p class="muted">Se paga cada año. Abarata el médico, los tratamientos y las operaciones.</p><div class="choices">${INS.map((x,i)=>`<button class="btn ghost" data-k="i${i}">${x.n}${x.c?` · ${fmt(x.c*W())} al año · cubre el ${Math.round(x.cov*100)} %`:' · pagas todo tú'}${(p.ins||0)===i?' (actual)':''}</button>`).join('')}</div>`,map)}
-  if(a==='treat'){const c=1200*W()*(1-ins.cov);if(!pay(c))return result(`El tratamiento cuesta ${fmt(c)}.`);p.treated=p.age;st('hea',R(2,5));return done(`💊 Empiezas el tratamiento para tu ${p.chronic.join(' y tu ')}. Este año lo tienes controlado.`)}
 };
 
 const CLUBS=[['teatro','🎭'],['robótica','🤖'],['debate','🗣️'],['periódico escolar','📰'],['coro','🎶'],['ajedrez','♟️'],['deportes','⚽']];
