@@ -94,6 +94,16 @@ button.card:not(:disabled):hover{border-color:var(--accent)}
 .btn.ghost:not(:disabled):hover{border-color:var(--accent)}
 .btn.small{padding:6px 10px;font-size:13px}
 .btns{display:flex;flex-wrap:wrap;gap:6px}
+.who{flex:1}
+.avatar{width:58px;height:58px;flex-shrink:0}
+.avatar svg{width:100%;height:100%;display:block}
+.avatar.big{width:84px;height:84px;margin:0 auto 6px}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:40}
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.app.shake{animation:shake .4s}
+@media (prefers-reduced-motion: reduce){.app.shake{animation:none}}
+.cpbox{width:100%;background:var(--sunk);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;font-family:var(--mono);font-size:12px;resize:vertical}
+.tut b{color:var(--accent)}
 .traits{margin:-4px 0 0;font-size:12.5px;color:var(--muted)}
 .mem{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:340px;margin:0 auto}
 .memc{aspect-ratio:1;font-size:28px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);max-width:100%}
@@ -142,6 +152,7 @@ button.card:not(:disabled):hover{border-color:var(--accent)}
 
 <div class="app">
   <header class="top">
+    <div class="avatar" id="avatar" aria-hidden="true"></div>
     <div class="who">
       <h1 id="name"></h1>
       <p class="meta" id="meta"></p>
@@ -150,7 +161,7 @@ button.card:not(:disabled):hover{border-color:var(--accent)}
     <div class="top-actions">
       <button class="chip free" id="btn-free">🪄 Modo libre</button>
       <button class="chip" id="btn-new">🔄 Nueva vida</button>
-      <button class="chip" id="btn-slots">💾 Partidas</button>
+      <button class="chip" id="btn-slots">☰ Menú</button>
     </div>
   </header>
   <section class="stats" id="stats" aria-label="Estadísticas"></section>
@@ -341,8 +352,8 @@ const SHOPCATS=[
   I('🎬','Productora de cine',1500000,{rate:.15,risk:.7}),I('🏨','Hotel',2000000,{rate:.12,risk:.25}),I('🎰','Casino',5000000,{rate:.22,risk:.4}),
   I('🏆','Club deportivo profesional',20000000,{rate:.08,risk:.4})]}];
 const DEP={car:.88,moto:.85,house:1.025,boat:.9,plane:.9,jewel:1,fashion:.6,tech:.65,art:1.03,music:.97,lux:1.02};
-const INV=[{k:'bond',e:'🏛️',n:'Bonos del Estado',mu:.03,sd:.01,r:'muy bajo'},{k:'index',e:'📈',n:'Fondo indexado',mu:.07,sd:.15,r:'medio'},
-  {k:'stock',e:'🏭',n:'Acciones de empresas',mu:.08,sd:.3,r:'alto'},{k:'gold',e:'🥇',n:'Oro',mu:.04,sd:.12,r:'medio'},
+const INV=[{k:'bond',e:'🏛️',n:'Bonos del Estado',mu:.03,sd:.01,r:'muy bajo'},{k:'index',e:'📈',n:'Fondo indexado',mu:.05,sd:.15,r:'medio'},
+  {k:'stock',e:'🏭',n:'Acciones de empresas',mu:.06,sd:.3,r:'alto'},{k:'gold',e:'🥇',n:'Oro',mu:.04,sd:.12,r:'medio'},
   {k:'crypto',e:'🪙',n:'Criptomonedas',mu:.15,sd:.8,r:'altísimo'}];
 const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
 let shopCat=0;
@@ -354,7 +365,8 @@ const queue=[];
 /* ---------- utilidades ---------- */
 const g=(m,f)=>p.sex==='F'?f:m;
 const W=()=>COUNTRIES[p.c].w;
-function fmt(v){const c=COUNTRIES[p.c];const n=Math.round(v*c.k);const s=new Intl.NumberFormat('es-ES',{useGrouping:'always'}).format(Math.abs(n));const sg=n<0?'−':'';return c.suf?`${sg}${s} €`:`${sg}${c.sym} ${s}`}
+function fmt(v){return fmtC(v,p.c)}
+function fmtC(v,ci){const c=COUNTRIES[ci]||COUNTRIES[0];const n=Math.round(v*c.k);const s=new Intl.NumberFormat('es-ES',{useGrouping:'always'}).format(Math.abs(n));const sg=n<0?'−':'';return c.suf?`${sg}${s} €`:`${sg}${c.sym} ${s}`}
 const cfmt=n=>new Intl.NumberFormat('es-ES',{notation:'compact',maximumFractionDigits:1}).format(n);
 const fame=()=>Math.min(100,Math.round(Math.log10((p.foll||0)+1)*15));
 function st(k,d){p.s[k]=clamp(Math.round(p.s[k]+d),0,100)}
@@ -364,7 +376,8 @@ function pay(v){if(p.money>=v){p.money-=v;return true}return false}
 function used(k){return p.used[k]||0}
 function use(k){p.used[k]=used(k)+1}
 const PER_YEAR=5;
-const full=k=>used(k)>=PER_YEAR;
+const LIMITS={acast:3,ptour:1,mbrand:1,cdonate:2,msmug:2,mcasino:2,pbribe:1};
+const full=k=>used(k)>=(LIMITS[k]||PER_YEAR);
 const left=k=>used(k)?` (quedan ${PER_YEAR-used(k)})`:'';
 const inc=k=>{p.cnt[k]=(p.cnt[k]||0)+1};
 function label(r){const F=r.sex==='F';return {parent:F?'Madre':'Padre',sibling:F?'Hermana':'Hermano',partner:F?'Novia':'Novio',spouse:F?'Esposa':'Esposo',child:F?'Hija':'Hijo',friend:F?'Amiga':'Amigo'}[r.role]}
@@ -387,7 +400,7 @@ function addChild(age=0){
   const pt=partner();const sex=pick(['M','F']);
   const s1=p.last.split(' ')[0], s2=pt?pt.last.split(' ')[0]:pick(SUR);
   const last=(p.sex==='F'&&pt&&pt.sex==='M')?`${s2} ${s1}`:`${s1} ${s2}`;
-  const c=person('child',{sex,age,bond:R(80,95),last});c.st={sma:R(20,90),hea:R(70,100),loo:R(20,90),hap:R(60,95)};p.rels.push(c);return c}
+  const c=person('child',{sex,age,bond:R(80,95),last});c.st={sma:R(20,90),hea:R(70,100),loo:R(20,90),hap:R(60,95)};c.av=mixAv(p.av,pt?.av);p.rels.push(c);return c}
 let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600)}
 
 /* ---------- logros ---------- */
@@ -460,7 +473,7 @@ const ACH=[
  {id:'retire',e:'🏖️',n:'A vivir, que son dos días',d:'Jubílate',t:()=>!!p.retired},
  {id:'dynasty',e:'🧬',n:'Dinastía',d:'Juega 3 generaciones de una familia',t:()=>S.gen>=3},
  {id:'lives10',e:'♾️',n:'Mil vidas',d:'Termina 10 vidas',t:()=>S.cemetery.length>=10}];
-function grant(id){if(S.ach[id])return;const a=ACH.find(x=>x.id===id);if(!a)return;S.ach[id]=1;toast(`🏆 Logro: ${a.e} ${a.n}`)}
+function grant(id){if(S.ach[id])return;const a=ACH.find(x=>x.id===id);if(!a)return;S.ach[id]=1;toast(`🏆 Logro: ${a.e} ${a.n}`);celebrate()}
 function checkAch(){if(!p)return;for(const a of ACH)if(a.t&&!S.ach[a.id]){try{if(a.t())grant(a.id)}catch(e){}}}
 function ribbon(){
   const k=p.rels.filter(r=>r.role==='child').length,w=worth();
@@ -514,7 +527,7 @@ function continueAs(kid){
   const old=p, kids=kidsOf();
   const share=heirShare(old,kid,kids);
   const pt=old.rels.find(r=>(r.role==='spouse'||r.role==='partner'));
-  const np=baseLife({first:kid.first,sex:kid.sex,c:old.c,last:kid.last,age:kid.age,money:share,born:(old.born??NOW)+old.age-kid.age,inherit:old.traits,kidSt:kid.st,langs:old.langs});
+  const np=baseLife({first:kid.first,sex:kid.sex,c:old.c,last:kid.last,age:kid.age,money:share,born:(old.born??NOW)+old.age-kid.age,inherit:old.traits,kidSt:kid.st,langs:old.langs,av:kid.av});
   np.rels.push({id:uid(),role:'parent',sex:old.sex,first:old.first,last:old.last,age:old.age,bond:kid.bond,alive:false,loo:old.s.loo});
   if(pt)np.rels.push({...pt,role:'parent',id:uid()});
   kids.filter(k=>k!==kid).forEach(k=>np.rels.push({...k,role:'sibling',id:uid()}));
@@ -837,14 +850,16 @@ function pushEvent(ev){ev._t=ev.txt();queue.push(ev)}
 function runQueue(){
   const ev=queue[0];if(!ev){closeModal();return}
   if(ev.death){showDeath();return}
+  if(ev.cond&&!ev.cond()){queue.shift();return runQueue()}
   const map={};
   ev.ch.forEach((c,i)=>map['c'+i]=()=>{
     const res=c[1]();L(res);S.lastEv=EVENTS.includes(ev)?ev:S.lastEv;save();render();
     openModal(`<p class="res">${res}</p><div class="choices"><button class="btn" data-k="ok">Continuar</button></div>`,{ok:()=>{queue.shift();runQueue()}},false);
   });
+  if(['🌍','🌊','☄️','⚔️'].some(x=>(ev._t||'').startsWith(x)||(ev.title||'').startsWith(x)))shake();
   openModal(`<p class="eyebrow">${p.age} años</p><h2>${ev.title||(p.jail?'⛓️ En prisión':'🎲 Algo pasa')}</h2><p>${ev._t}</p><div class="choices">${ev.ch.map((c,i)=>`<button class="btn ghost" data-k="c${i}">${c[0]}</button>`).join('')}</div>`,map,false);
 }
-function special(title,txt,ch){queue.push({title,_t:txt,ch})}
+function special(title,txt,ch,cond){queue.push({title,_t:txt,ch,cond})}
 function enroll(m){p.uni={m:m.n,left:m.y};if(p.job&&!p.job.pt)p.job=null;return `${MAJOR_E[m.n]||'🎓'} Te matriculas en ${m.n}. Te esperan ${m.y} años de estudio.`}
 function retire(){p.pension=p.job.sal*.6;p.job=null;p.retired=true;st('hap',10);return `🏖️ Te jubilas. Cobrarás ${fmt(p.pension)} al año.`}
 function hire(j,extra={}){p.job={t:j.t,e:j.e,sal:j.sal*W()*(.9+Math.random()*.2)*(p.undoc?.7:1)*(speaks(langOf(p.c))?1:.8),perf:60,yrs:0,pt:!!j.pt,lvl:0,fam:!!j.fam,music:!!j.music,...extra};p.everJob=true;st('hap',6)}
@@ -853,7 +868,7 @@ function hire(j,extra={}){p.job={t:j.t,e:j.e,sal:j.sal*W()*(.9+Math.random()*.2)
 function ageUp(){
   if(!p.alive){newLifeForm();return}
   if(queue.length)return;
-  p.age++;p.used={};yearEntry();
+  p.age++;p.used={};yearEntry();sfx('tick');
   const a=p.age;
   if(a===1)L(pick(['Dices tu primera palabra: «agua».','Das tus primeros pasos agarrado al sofá.','Dices «mamá» por primera vez.']));
   if(a===3)L('🧸 Empiezas la guardería. Lloras el primer día.');
@@ -906,14 +921,14 @@ function ageUp(){
     j.yrs++;j.perf=clamp(j.perf+R(-8,6)+(p.s.sma>70?2:0),0,100);
     if(j.mil){inc('mil');if(chance(.25))special('🎖️ Misión en el extranjero','Tu unidad recibe órdenes de partir a una misión de paz.',[
       ['Ir en primera línea',()=>{if(chance(.2)){st('hea',-R(15,35));return 'Te hieren durante la misión. Vuelves con una medalla y cicatrices.'}p.job.perf=clamp(p.job.perf+15,0,100);p.karma++;return '🎖️ Cumples la misión con honores. Te condecoran.'}],
-      ['Pedir un puesto en la base',()=>{p.job.perf=clamp(p.job.perf-5,0,100);return 'Pasas la misión organizando suministros.'}]])}
+      ['Pedir un puesto en la base',()=>{p.job.perf=clamp(p.job.perf-5,0,100);return 'Pasas la misión organizando suministros.'}]],()=>!!p.job?.mil)}
     if(j.music&&chance(.3)){
       if(chance((p.s.sma+p.s.loo)/260)){const f=R(10000,500000),m=R(5000,80000)*W();p.foll+=f;p.money+=m;grant('hit');st('hap',15);L(`🎤 ¡Tu nuevo single arrasa! ${cfmt(f)} seguidores nuevos y ${fmt(m)} en derechos.`,'good')}
       else L('🎵 Sacas un single que pasa sin pena ni gloria.');
     }
     if(j.fam)p.foll+=R(300,12000)*(j.lvl+1);
     if(j.perf<15&&chance(.5)){L(`Te despiden de tu puesto de ${jt(j).toLowerCase()}.`,'bad');p.job=null;st('hap',-12)}
-    else if(j.perf>=78&&j.yrs>=2&&chance(.45)&&(!j.mil||j.lvl<7)){j.lvl++;j.sal*=1.15;j.yrs=0;st('hap',8);L(j.mil?`🎖️ Ascenso: ahora eres ${RANKS[Math.min(j.lvl,7)].toLowerCase()}.`:`📈 ¡Te ascienden! Ahora ganas ${fmt(j.sal)} al año.`,'good')}
+    else if(j.perf>=78&&j.yrs>=2&&chance(.45)&&(j.mil?j.lvl<7:j.lvl<5)){j.lvl++;j.sal*=1.15;j.yrs=0;st('hap',8);L(j.mil?`🎖️ Ascenso: ahora eres ${RANKS[Math.min(j.lvl,7)].toLowerCase()}.`:`📈 ¡Te ascienden! Ahora ganas ${fmt(j.sal)} al año.`,'good')}
   }
   if(p.mob){const m=p.mob;m.yrs++;m.heat=clamp(m.heat-8,0,100);
     if(!p.jail){
@@ -937,7 +952,7 @@ function ageUp(){
   let bizT=0;
   for(const b of p.biz){b.yrs=(b.yrs||0)+1;
     if(b.su){const r=Math.random();if(r<.08){b.v*=R(5,20);b.last=0;L(`🚀 ¡Tu startup se dispara! Ahora vale ${fmt(b.v)}.`,'good')}else if(r<.2){b.dead=true;L('💥 Tu startup se queda sin dinero y cierra.','bad');continue}else b.last=-b.v*.08}
-    else{b.last=b.v*b.rate*(1+(Math.random()*2-1)*b.risk*1.6)*(has('business')?1.3:1);b.v*=.97+Math.random()*.1;
+    else{b.last=b.v*b.rate*.6*(1+(Math.random()*2-1)*b.risk*1.6)*(has('business')?1.3:1);b.v*=.97+Math.random()*.1;
       if(chance(b.risk>=.5?.04:.015)){b.dead=true;L(`💥 Tu negocio (${b.n.toLowerCase()}) quiebra y tienes que cerrarlo.`,'bad');continue}}
     bizT+=b.last;
   }
@@ -946,6 +961,7 @@ function ageUp(){
   if(rent)L(`🏘️ Cobras ${fmt(rent)} de alquileres.`,'money');
   earn+=yearSpecial();
   if(p.mob&&!p.jail){const s=(2000+p.mob.rank*p.mob.rank*6000)*(.7+Math.random()*.6);earn+=s;L(`🕴️ Tu parte de los negocios de la familia: ${fmt(s)}.`,'money')}
+  if(a>=18&&!p.jail)cost+=Math.max(0,earn)*.5;
   if(earn||cost){p.money+=earn-cost;L(`Ingresos ${fmt(earn)} · gastos ${fmt(cost)}`,'money')}
   let invT=0;p.invLast={};
   for(const x of INV){const amt=p.inv[x.k]||0;if(amt<1)continue;let r=x.mu+x.sd*gauss();if(x.k==='crypto'&&chance(.1))r=-.7;r=Math.max(-.95,r);p.inv[x.k]=amt*(1+r);p.invLast[x.k]=r;invT+=amt*r}
@@ -968,14 +984,14 @@ function ageUp(){
   if(a>35&&!p.vamp)st('loo',-R(0,2));
   if(a>70)st('sma',-R(0,2));
   p.study=Math.max(0,p.study-1);
-  if(p.sick){st('hea',-R(4,10));L(`🤒 Sigues con ${p.sick}. Deberías ir al médico.`,'bad')}
+  if(p.sick){if(a<18){L(`🙂 Tus padres te llevan al médico y te curas de ${p.sick}.`);p.sick=null}else if(chance(.4)){L(`🙂 Te recuperas poco a poco de ${p.sick}.`);p.sick=null}else{st('hea',-R(2,6));L(`🤒 Sigues con ${p.sick}. Deberías ir al médico.`,'bad')}}
   else if(chance((a>50?.1:.04)*(has('healthy')?.4:1))){p.sick=pick(['una gripe muy fuerte','bronquitis','migrañas crónicas','una infección de oído','anemia']);st('hea',-R(3,8));L(`🤒 Te diagnostican ${p.sick}.`,'bad')}
   // muerte
   const dc=p.vamp?0:a<50?.0008:Math.pow((a-50)/50,3)*(1.4-p.s.hea/100);
   if(p.s.hea<=0)die(pick(['una insuficiencia cardíaca','complicaciones de salud']));
   else if(chance(dc))die(a<50?pick(['un accidente de tráfico','un accidente doméstico']):pick(['causas naturales, mientras dormía','un infarto','una neumonía','un ictus']));
   if(p.alive){
-    if(p.job&&!p.job.pt&&!p.job.sport&&a>=65&&(a-65)%3===0)special('🏖️ Jubilación',`Te ofrecen la jubilación. Cobrarías ${fmt(p.job.sal*.6)} al año.`,[['Jubilarme',()=>retire()],['Seguir trabajando',()=>'Todavía te queda cuerda.']]);
+    if(p.job&&!p.job.pt&&!p.job.sport&&a>=65&&(a-65)%3===0)special('🏖️ Jubilación',`Te ofrecen la jubilación. Cobrarías ${fmt(p.job.sal*.6)} al año.`,[['Jubilarme',()=>retire()],['Seguir trabajando',()=>'Todavía te queda cuerda.']],()=>!!p.job&&!p.job.pt);
     if(a>=2&&chance(.7)){const e=randomEvent();if(e)pushEvent(e)}
   }
   save();render();
@@ -989,6 +1005,7 @@ function die(cause){
   S.ribbons[`${e} ${n}`]=(S.ribbons[`${e} ${n}`]||0)+1;
   L(`🕊️ Mueres a los ${p.age} años por ${cause}.`,'bad');
   S.cemetery.push({n:`${p.first} ${p.last}`,age:p.age,cause,rib:e});
+  submitHall();sfx('death');
   queue.length=0;queue.push({death:true});
 }
 
@@ -997,7 +1014,7 @@ const ACTS=[
  {k:'gym',e:'🏋️',n:'Ir al gimnasio',d:'Salud y aspecto',min:12,cost:()=>p.age>=18?300:0,fn:()=>{st('hea',R(2,6));st('loo',R(0,3));st('hap',R(0,3));p.athl+=R(0,2);return pick([`Sales del gimnasio ${g('agotado','agotada')} pero feliz.`,'Te machacas en la cinta de correr.','Pruebas una clase de spinning y casi te desmayas.'])}},
  {k:'read',e:'📚',n:'Leer un libro',d:'Inteligencia',min:5,fn:()=>{st('sma',R(1,4));st('hap',R(0,2));return `Lees «${pick(BOOKS)}».`}},
  {k:'med',e:'🧘',n:'Meditar',d:'Felicidad',min:10,fn:()=>{st('hap',R(2,6));addStress(-R(5,12));return 'Diez minutos de silencio. Te sienta de maravilla.'}},
- {k:'doc',e:'🩺',n:'Ir al médico',d:'Cura enfermedades',min:0,cost:()=>p.age>=18?150:0,fn:()=>{if(p.sick){const s=p.sick;p.sick=null;st('hea',R(6,14));return `El médico te trata la ${s.replace(/^una /,'')}. Ya estás mejor.`}st('hea',R(1,4));return 'Revisión rutinaria: todo en orden.'}},
+ {k:'doc',e:'🩺',n:'Ir al médico',d:'Cura enfermedades',min:0,cost:()=>p.age>=18?Math.round(150*(1-INS[p.ins||0].cov)):0,fn:()=>{if(p.sick){const s=p.sick;p.sick=null;st('hea',R(6,14));return `El médico te trata la ${s.replace(/^una /,'')}. Ya estás mejor.`}st('hea',R(1,4));return 'Revisión rutinaria: todo en orden.'}},
  {k:'party',e:'🪩',n:'Salir de fiesta',d:'Felicidad, con riesgo',min:16,cost:()=>60,fn:()=>{inc('party');addict('alcohol',4);if(chance(.15)){st('hea',-R(4,10));return 'Te pasas con las copas. Resaca épica.'}st('hap',R(4,10));if(chance(.15)){const f=addFriend();return `Bailas toda la noche y conoces a ${f.first}. Os hacéis amigos.`}return 'Una noche estupenda con tus amigos.'}},
  {k:'vol',e:'🤲',n:'Hacer voluntariado',d:'Felicidad y karma',min:12,fn:()=>{p.karma+=2;st('hap',R(3,7));return pick(['Ayudas en un comedor social.','Pasas la tarde limpiando una playa.','Lees cuentos en una residencia de mayores.'])}},
  {k:'trip',e:'✈️',n:'Irte de vacaciones',d:'Mucha felicidad',min:18,cost:()=>1500,fn:()=>{st('hap',R(8,16));st('hea',R(0,3));addStress(-R(10,20));return `Pasas una semana en ${pick(PLACES)}.`}},
@@ -1061,7 +1078,7 @@ function mobRat(){const o=MOBS[p.mob.i];
 const MOB_ACTS=[
  {k:'mfavor',e:'🤝',n:'Hacer un favor al jefe',d:'Respeto',fn:()=>{mobResp(R(3,7));mobHeat(R(1,4));return pick(['Llevas un sobre cerrado a un concejal sin hacer preguntas.','Recoges a un «amigo» en el aeropuerto.','Guardas un paquete en tu casa una semana.'])}},
  {k:'mprot',e:'💼',n:'Cobrar la «protección»',d:'Dinero y respeto',fn:()=>{const x=R(500,3000)*(p.mob.rank+1);p.money+=x;mobResp(R(2,5));mobHeat(R(4,9));p.karma-=2;return `Haces la ronda por los comercios del barrio. Recaudas ${fmt(x)}.`}},
- {k:'msmug',e:'📦',n:'Mover contrabando',d:'Mucho dinero, mucho riesgo',fn:()=>{p.karma-=3;if(chance(.2)){mobHeat(R(15,25));return mobBust('contrabando para una organización criminal')}const x=R(5000,25000)*(p.mob.rank+1);p.money+=x;mobResp(R(3,6));mobHeat(R(8,15));return `El cargamento llega sin problemas. Tu parte: ${fmt(x)}.`}},
+ {k:'msmug',e:'📦',n:'Mover contrabando',d:'Mucho dinero, mucho riesgo',fn:()=>{p.karma-=3;if(chance(.2)){mobHeat(R(15,25));return mobBust('contrabando para una organización criminal')}const x=R(3000,12000)*(p.mob.rank+1);p.money+=x;mobResp(R(3,6));mobHeat(R(8,15));return `El cargamento llega sin problemas. Tu parte: ${fmt(x)}.`}},
  {k:'mcasino',e:'🎲',n:'Llevar un casino clandestino',d:'Ingresos estables',req:()=>p.mob.rank>=1?'':'Desde soldado',fn:()=>{const x=R(3000,12000)*p.mob.rank;p.money+=x;mobHeat(R(3,7));return `Las mesas no paran en toda la noche. Te llevas ${fmt(x)}.`}},
  {k:'mrival',e:'⚔️',n:'Plantar cara a la banda rival',d:'Mucho respeto, peligroso',fn:()=>{p.karma-=3;mobHeat(R(8,15));if(chance(.35)){st('hea',-R(15,40));mobResp(-R(2,6));return 'La cosa sale mal y acabas en el hospital.'}mobResp(R(8,15));return 'Tu bando gana el pulso. La banda rival se retira de vuestro territorio.'}},
  {k:'mrecruit',e:'🧑‍🤝‍🧑',n:'Reclutar gente nueva',d:'Respeto',req:()=>p.mob.rank>=2?'':'Desde capo',fn:()=>{mobResp(R(4,8));mobHeat(R(2,5));return 'Dos chavales del barrio se unen a tu grupo.'}},
@@ -1099,7 +1116,7 @@ const OUTDOOR=[
 ];
 const LISTS={a:ACTS,s:SOCIAL,c:CRIMES,j:JAIL_ACTS,m:MOB_ACTS,h:HUSTLE,o:OUTDOOR};
 function costOf(a){return a.cost?a.cost():0}
-const limOf=a=>a.limit||PER_YEAR;
+const limOf=a=>a.limit||LIMITS[a.k]||PER_YEAR;
 function whyNot(a){return p.age<(a.min||0)?`Desde los ${a.min} años`:used(a.k)>=limOf(a)?`Ya van ${limOf(a)} este año`:(a.req&&a.req())||''}
 function doAct(a,kind){
   if(whyNot(a))return;
@@ -1205,7 +1222,7 @@ function tryout(){
     done(`${s.e} ¡Fichas por un club de ${s.n.toLowerCase()}! Cobrarás ${fmt(p.job.sal)} al año.`)});
   openModal(`<p class="eyebrow">Prueba con un club</p><h2>¿Qué deporte?</h2><p class="muted">Tu forma física: ${p.athl}/100. Cuanto más alta, más fácil que te fichen.</p><div class="choices">${SPORTS.map((s,i)=>`<button class="btn ghost" data-k="s${i}">${s.e} ${s.n}</button>`).join('')}</div>`,map);
 }
-function done(t){L(t);save();render();result(t)}
+function done(t){L(t);save();render();result(t);sfx('pop')}
 
 /* ---------- carreras especiales y expansiones ---------- */
 const X={};
@@ -1214,7 +1231,7 @@ const btn=(mod,act,label,dis,ghost)=>`<button class="btn small ${ghost?'ghost':'
 const banner=(t,note,btns)=>`<div class="banner"><b>${t}</b><p class="note" style="margin:2px 0 8px">${note}</p><div class="btns">${btns}</div></div>`;
 
 const ROLES=[{n:'Anuncio de televisión',pay:800,f:200},{n:'Figurante en una serie',pay:1500,f:300},{n:'Papel secundario en una serie',pay:12000,f:3000},
-  {n:'Protagonista de una serie',pay:60000,f:30000},{n:'Papel secundario en una película',pay:150000,f:60000},{n:'Protagonista de una película',pay:900000,f:300000}];
+  {n:'Protagonista de una serie',pay:60000,f:30000},{n:'Papel secundario en una película',pay:150000,f:60000},{n:'Protagonista de una película',pay:600000,f:300000}];
 X.actor=a=>{const A=p.actor||(p.actor={sk:R(5,20),roles:0,best:-1,awards:0});
   if(a==='class'){if(!pay(200))return result(`Las clases cuestan ${fmt(200)}.`);use('aclass');A.sk=clamp(A.sk+R(3,7),0,100);return done(`🎭 Clase de interpretación. Tu talento sube a ${A.sk}.`)}
   const map={},open=ROLES.filter((r,i)=>i<=A.best+2);
@@ -1307,18 +1324,18 @@ X.dir=a=>{const D=p.dir||(p.dir={sk:R(5,20),films:0,best:0,awards:0,box:0});
 };
 function dirBudget(gi){const D=p.dir,studio=D.best>=70||fame()>=50,map={};
   BUDGETS.forEach((b,i)=>map['b'+i]=()=>{if(!studio&&!pay(b.v))return result(`No tienes ${fmt(b.v)}.`);use('dfilm');
-    const q=clamp(D.sk+R(-25,25)+(i>=2?5:0),0,100),box=b.v*(.2+Math.pow(q/100,2)*4+(chance(.05)?R(3,10):0));
-    const gain=studio?b.v*.05+Math.max(0,box-b.v)*.1:box;p.money+=gain;D.films++;D.best=Math.max(D.best,q);D.box+=box;D.sk=clamp(D.sk+R(2,6),0,100);p.foll+=Math.round(box/200);
+    const q=clamp(D.sk+R(-25,25)+(i>=2?5:0),0,100),box=b.v*(.3+Math.pow(q/100,2)*2.2+(chance(.04)?R(2,6):0));
+    const gain=studio?b.v*.01+Math.max(0,box-b.v)*.08:box;p.money+=gain;D.films++;D.best=Math.max(D.best,q);D.box+=box;D.sk=clamp(D.sk+R(2,6),0,100);p.foll+=Math.round(box/200);
     let t=`🎥 Estrenas «${pick(T1)} ${pick(T2)}» (${GENRES[gi].toLowerCase()}). Crítica: ${Math.round(q/10)}/10. Taquilla: ${fmt(box)}. Te llevas ${fmt(gain)}.`;
     if(q>=85&&chance(.4)){D.awards++;grant('dirAward');t+=' 🏆 ¡Estatuilla Dorada a la mejor dirección!'}
     st('hap',q>=60?8:-3);done(t)});
-  openModal(`<p class="eyebrow">🎥 ${GENRES[gi]}</p><h2>¿Qué presupuesto?</h2><p class="muted">${studio?'Un estudio pone el dinero: cobras un 5 % del presupuesto y un 10 % de los beneficios.':'Lo pagas tú y te quedas toda la taquilla. Con fama o un éxito, un estudio te financiará.'}</p><div class="choices">${BUDGETS.map((b,i)=>`<button class="btn ghost" data-k="b${i}" ${!studio&&p.money<b.v?'disabled':''}>${b.n} · ${fmt(b.v)}</button>`).join('')}</div>`,map);
+  openModal(`<p class="eyebrow">🎥 ${GENRES[gi]}</p><h2>¿Qué presupuesto?</h2><p class="muted">${studio?'Un estudio pone el dinero: cobras un 1 % del presupuesto y un 8 % de los beneficios.':'Lo pagas tú y te quedas toda la taquilla. Con fama o un éxito, un estudio te financiará.'}</p><div class="choices">${BUDGETS.map((b,i)=>`<button class="btn ghost" data-k="b${i}" ${!studio&&p.money<b.v?'disabled':''}>${b.n} · ${fmt(b.v)}</button>`).join('')}</div>`,map);
 }
 
 const BLACK=[
-  {e:'📱',n:'Móvil «caído de un camión»',v:200,k:'tech',val:1200,h:2,risk:.08},{e:'⌚',n:'Reloj de imitación',v:150,k:'jewel',val:0,h:2,loo:1,risk:.05},
-  {e:'👜',n:'Bolso falsificado',v:100,k:'fashion',val:0,h:2,risk:.05},{e:'🚗',n:'Coche sin papeles',v:8000,k:'car',val:24000,h:3,risk:.25},
-  {e:'🖼️',n:'Cuadro de origen dudoso',v:60000,k:'art',val:500000,h:5,risk:.3,d:'art'},{e:'💎',n:'Diamante sin certificado',v:40000,k:'jewel',val:300000,h:6,risk:.25},
+  {e:'📱',n:'Móvil «caído de un camión»',v:200,k:'tech',val:500,h:2,risk:.08},{e:'⌚',n:'Reloj de imitación',v:150,k:'jewel',val:0,h:2,loo:1,risk:.05},
+  {e:'👜',n:'Bolso falsificado',v:100,k:'fashion',val:0,h:2,risk:.05},{e:'🚗',n:'Coche sin papeles',v:8000,k:'car',val:12000,h:3,risk:.25},
+  {e:'🖼️',n:'Cuadro de origen dudoso',v:60000,k:'art',val:90000,h:5,risk:.3,d:'art'},{e:'💎',n:'Diamante sin certificado',v:40000,k:'jewel',val:55000,h:6,risk:.25},
   {e:'📦',n:'Lote de mercancía para revender',v:2000,resell:true,risk:.15}];
 X.black=()=>{const map={};
   BLACK.forEach((it,i)=>map['b'+i]=()=>{if(!pay(it.v))return result(`No tienes ${fmt(it.v)}.`);use('bm');p.karma--;
@@ -1335,16 +1352,16 @@ X.cult=a=>{
   const C=p.cult;if(!C)return;
   if(a==='preach'){use('cpreach');const n=Math.round(R(1,10)*(1+fame()/40)*(C.temple?2:1));C.foll+=n;return done(`🗣️ Predicas en la plaza. Se unen ${n} personas.`)}
   if(a==='book'){C.book=true;C.foll=Math.round(C.foll*1.5)+R(20,300);p.foll+=R(500,5000);return done('📜 Escribes el libro del movimiento. Se vende sorprendentemente bien.')}
-  if(a==='donate'){use('cdonate');const x=C.foll*R(5,30);p.money+=x;C.trust=clamp(C.trust-R(3,8),0,100);p.karma-=2;return done(`💰 Pides donativos «para la causa». Recaudas ${fmt(x)}. Algunos empiezan a sospechar.`)}
+  if(a==='donate'){use('cdonate');const x=C.foll*R(1,6);p.money+=x;C.trust=clamp(C.trust-R(3,8),0,100);p.karma-=2;return done(`💰 Pides donativos «para la causa». Recaudas ${fmt(x)}. Algunos empiezan a sospechar.`)}
   if(a==='retreat'){if(!pay(1000))return result(`Organizarlo cuesta ${fmt(1000)}.`);use('cretreat');C.trust=clamp(C.trust+R(5,10),0,100);const x=C.foll*R(2,10);p.money+=x;st('hap',4);return done(`🧘 Organizas un retiro en el campo. Todos vuelven encantados y pagan ${fmt(x)}.`)}
   if(a==='temple'){if(!pay(200000))return result(`El templo cuesta ${fmt(200000)}.`);C.temple=true;return done('🏛️ Inauguras el templo del movimiento. Ahora crecerá mucho más rápido.')}
   if(a==='dissolve'){p.cult=null;return done('🚪 Disuelves el movimiento. Tus seguidores vuelven a sus vidas.')}
 };
 
-const ANIMALS=[{k:'peng',e:'🐧',n:'Pingüinos',v:20000,a:3},{k:'birds',e:'🦜',n:'Aviario tropical',v:30000,a:2},{k:'zebra',e:'🦓',n:'Cebras',v:40000,a:3},
-  {k:'croc',e:'🐊',n:'Cocodrilos',v:60000,a:4},{k:'giraffe',e:'🦒',n:'Jirafas',v:80000,a:5},{k:'hippo',e:'🦛',n:'Hipopótamos',v:120000,a:5},
-  {k:'lion',e:'🦁',n:'Leones',v:150000,a:8},{k:'tiger',e:'🐅',n:'Tigres',v:160000,a:8},{k:'gorilla',e:'🦍',n:'Gorilas',v:200000,a:7},
-  {k:'eleph',e:'🐘',n:'Elefantes',v:250000,a:9},{k:'dolph',e:'🐬',n:'Delfines',v:300000,a:9},{k:'panda',e:'🐼',n:'Pandas',v:1000000,a:15}];
+const ANIMALS=[{k:'peng',e:'🐧',n:'Pingüinos',v:20000,a:1},{k:'birds',e:'🦜',n:'Aviario tropical',v:30000,a:1.5},{k:'zebra',e:'🦓',n:'Cebras',v:40000,a:2},
+  {k:'croc',e:'🐊',n:'Cocodrilos',v:60000,a:3},{k:'giraffe',e:'🦒',n:'Jirafas',v:80000,a:4},{k:'hippo',e:'🦛',n:'Hipopótamos',v:120000,a:6},
+  {k:'lion',e:'🦁',n:'Leones',v:150000,a:7.5},{k:'tiger',e:'🐅',n:'Tigres',v:160000,a:8},{k:'gorilla',e:'🦍',n:'Gorilas',v:200000,a:10},
+  {k:'eleph',e:'🐘',n:'Elefantes',v:250000,a:12.5},{k:'dolph',e:'🐬',n:'Delfines',v:300000,a:15},{k:'panda',e:'🐼',n:'Pandas',v:1000000,a:50}];
 X.zoo=a=>{
   if(a==='buy'){if(!pay(3e6))return result(`Un zoológico cuesta ${fmt(3e6)}.`);p.zoo={an:{},rep:50,price:2};st('hap',10);return done('🦁 ¡Compras un zoológico! Ahora toca llenarlo de animales.')}
   const Z=p.zoo;if(!Z)return;
@@ -1405,11 +1422,11 @@ function yearSpecial(){let e=0;
   const C=p.cult;
   if(C){C.foll+=Math.round(C.foll*(C.temple?.22:.08)*(C.trust/60))+R(0,4);C.trust=clamp(C.trust+R(-4,3),0,100);
     if(C.foll>300&&C.trust<30&&chance(.25)){L(goJail(R(1,4),`estafar a los seguidores de ${C.n}`),'bad');p.cult=null}
-    else{const d=C.foll*2;e+=d;L(`🕯️ ${C.n}: ${cfmt(C.foll)} seguidores. Donativos: ${fmt(d)}.`,'money')}}
+    else{const d=C.foll*.5;e+=d;L(`🕯️ ${C.n}: ${cfmt(C.foll)} seguidores. Donativos: ${fmt(d)}.`,'money')}}
   const Z=p.zoo;
   if(Z){const appeal=ANIMALS.reduce((s,x)=>s+(Z.an[x.k]||0)*x.a,0);
-    const vis=Math.round((5000+appeal*3000)*(Z.rep/50)*[0,1.3,1,.7][Z.price]),inc2=vis*[0,8,15,25][Z.price]*W();
-    const net=inc2-(100000+ANIMALS.reduce((s,x)=>s+(Z.an[x.k]||0)*x.v*.06,0));e+=net;
+    const vis=Math.round((5000+appeal*300)*(Z.rep/50)*[0,1.3,1,.7][Z.price]),inc2=vis*[0,8,12,20][Z.price]*W();
+    const net=inc2-(100000+ANIMALS.reduce((s,x)=>s+(Z.an[x.k]||0)*x.v*.08,0));e+=net;
     Z.rep=clamp(Z.rep-R(0,4)+(Z.price===1?2:Z.price===3?-2:0),0,100);
     L(`🦁 Tu zoo recibe ${cfmt(vis)} visitas y ${net>=0?'gana':'pierde'} ${fmt(Math.abs(net))}.`,net>=0?'good':'bad');
     if((Z.an.lion||Z.an.tiger||Z.an.croc)&&chance(.05)){Z.rep=clamp(Z.rep-15,0,100);L('🚨 ¡Se escapa un animal peligroso del zoo! Sale en todas las noticias.','bad')}}
@@ -1491,6 +1508,7 @@ function finishLife(q,o){
   if(t('healthy'))q.s.hea=clamp(q.s.hea+10,0,100);if(t('athletic'))q.athl=clamp(q.athl+20,0,100);
   const nat=langOf(q.c);q.langs={[nat]:100};
   for(const [l,v] of Object.entries(o.langs||{}))if(l!==nat&&v>=50)q.langs[l]=Math.round(v*.5);
+  q.av=o.av||makeAv();q.ins=0;q.chronic=[];q.cool=R(20,60);
   q.stress=R(5,20)*(t('anxious')?2:1);q.addict={};q.hob={};q.born=o.born??NOW;q.goals=pickGoals();q.style='equilibrado';q.grand=[];
 }
 const ERA=[
@@ -1539,6 +1557,8 @@ function yearLife(a){
     if(p.style==='estricto'){s.sma=clamp(s.sma+R(0,2),0,100);r.bond=clamp(r.bond-R(0,2),0,100)}
     else if(p.style==='permisivo'){s.hap=clamp(s.hap+R(0,2),0,100);s.sma=clamp(s.sma-R(0,1),0,100);r.bond=clamp(r.bond+1,0,100)}
     else{s.sma=clamp(s.sma+R(0,1),0,100);s.hap=clamp(s.hap+R(0,1),0,100)}}
+  healthYear(a);schoolYear(a);
+  if(a>=3&&!p.jail&&chance(.25)){const hd=pick(HOLIDAYS.filter(h=>a>=(h.min||0)));if(hd)special(hd.t,typeof hd.txt==='function'?hd.txt():hd.txt,hd.ch)}
   p.grand=p.grand||[];for(const x of p.grand)x.age++;
   for(const r of kidsOf())if(r.age>=20&&r.age<=45&&p.grand.length<15&&chance(.1)){const sx=pick(['M','F']),gk={id:uid(),first:pick(sx==='M'?MN:FN),sex:sx,age:0,pid:r.id,pn:r.first};
     p.grand.push(gk);st('hap',8);L(`👶 ¡${g('Eres abuelo','Eres abuela')}! ${r.first} tiene ${sx==='F'?'una niña':'un niño'}: ${gk.first}.`,'good')}
@@ -1715,13 +1735,225 @@ function renderMore(){let h='';
   if(p.age>=12){const A=p.addict||{},worst=Math.max(0,...Object.values(A));
     h+=banner('🧠 Mente y salud',`Estrés ${p.stress||0}/100${(A.gamble||0)>=20?` · juego ${A.gamble}/100`:''}${(A.alcohol||0)>=20?` · alcohol ${A.alcohol}/100`:''}`,
       btn('mind','therapy',`🛋️ Terapia (${fmt(80*W())})`,full('mther'))+btn('mind','unplug','📵 Desconectar',full('munplug'),1)+(worst>=20?btn('mind','group','🤝 Grupo de apoyo',full('mgroup'),1)+btn('mind','rehab',`🏥 Rehabilitación (${fmt(3000*W())})`,full('mrehab'),1):''))}
+  if(p.age>=18){const ins=INS[p.ins||0];h+=banner('🏥 Seguro y salud',`Seguro: ${ins.n.toLowerCase()}${ins.c?` (${fmt(ins.c*W())} al año)`:''} · ${p.chronic?.length?`Enfermedades crónicas: ${p.chronic.join(', ')}${p.treated===p.age?' (en tratamiento)':''}`:'sin enfermedades crónicas'}`,
+    btn('health','ins','📄 Cambiar de seguro')+(p.chronic?.length?btn('health','treat',`💊 Tratamiento (${fmt(1200*W()*(1-ins.cov))})`,p.treated===p.age,1):''))}
   if(p.age>=14)h+=banner('📺 Concurso de preguntas','Minijuego: responde 5 preguntas en la tele. Cuantas más aciertes, más ganas.',btn('learn','tv','Participar (1 al año)',used('tv')>=1));
   if(p.age>=18&&partner())h+=banner('💋 Tentaciones','Una aventura a escondidas. Si te pillan, adiós relación.',btn('mind','affair','Tener una aventura',full('maffair'),1));
   return h}
 function renderLearn(){let h='';
+  if(p.school&&p.age>=6)h+=banner('🏫 Vida escolar',`Popularidad ${p.cool??40}/100${p.club?` · club de ${p.club}`:' · sin club'}`,btn('school','cool','😎 Intentar ser popular',full('scool'))+btn('school','club',p.club?'🔄 Cambiar de club':'🎭 Apuntarme a un club',used('sclub')>=1,1)+(p.age>=15?btn('school','exchange',`✈️ Intercambio (${fmt(3000*W())})`,used('sx')>=1||(p.cnt.exch||0)>=2,1):''));
+  if(p.uni)h+=banner('🎓 Vida universitaria',p.club?`Club de ${p.club}`:'Únete a un club o vete de intercambio a otro país.',btn('school','club',p.club?'🔄 Cambiar de club':'🎭 Apuntarme a un club',used('sclub')>=1)+btn('school','exchange',`✈️ Intercambio (${fmt(3000*W())})`,used('sx')>=1||(p.cnt.exch||0)>=2,1));
   if(p.school||p.uni)h+=banner('📝 Exámenes y estudio','Minijuegos: responde preguntas de examen o repasa con tarjetas de memoria.',btn('learn','exam','📝 Hacer un examen',full('exam'))+btn('learn','mem','🧠 Tarjetas de estudio',full('mem'),1));
   if(p.age>=6){const ls=Object.entries(p.langs||{}).sort((a,b)=>b[1]-a[1]);h+=`<h3>🗣️ Idiomas</h3><p class="note">${ls.map(([l,v])=>`${l} ${v}`).join(' · ')}</p>${btn('learn','lang','Estudiar un idioma',full('lang'))}`}
   return h}
+
+/* ---------- avatar, sonido, animaciones, menú, salud, escuela, fiestas, ranking ---------- */
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SKINS=['#f6d7c3','#eec4a2','#d9a47c','#b97c55','#8d5a3b','#5e3b26'];
+const HAIRC=['#1f1712','#4a3020','#7b4a2a','#b5793e','#d9b26a','#a5442c','#2a2a2a'];
+const SHIRTS=['#3d7a68','#c0703a','#5a6fb0','#b04a6a','#7a5aa8','#3a8aa0','#a08a3a'];
+function makeAv(){return {sk:R(0,5),hc:R(0,6),hs:R(0,4),sh:R(0,6),bd:chance(.5)}}
+function mixAv(a,b){a=a||makeAv();b=b||makeAv();return {sk:chance(.5)?a.sk:b.sk,hc:chance(.5)?a.hc:b.hc,hs:R(0,4),sh:R(0,6),bd:chance(.5)}}
+let avN=0;
+function avatarSVG(q){
+  const v=q.av||(q.av=makeAv()),a=q.age,F=q.sex==='F',s=q.s||{hap:60,hea:80,loo:50,sma:50},id='avc'+(++avN);
+  const skin=q.vamp?'#e9e5ee':SKINS[v.sk],hair=a>=75?'#e6e6e6':a>=55?'#9d9d9d':HAIRC[v.hc];
+  const k=a<3?1.15:a<13?1.07:1,cx=32,cy=29,r=15*k,top=cy-r,bald=!F&&a>=50&&v.hs===4;
+  let back='',front='';
+  if(a<1)front=`<path d="M${cx} ${top+1} q3 -5 6 -2" stroke="${hair}" stroke-width="2" fill="none"/>`;
+  else if(!bald){
+    if((F&&v.hs!==2)||v.hs===1)back=`<path d="M${cx-r-2} ${cy} Q${cx-r-3} ${cy+r+8} ${cx-r+3} ${cy+r+10} L${cx+r-3} ${cy+r+10} Q${cx+r+3} ${cy+r+8} ${cx+r+2} ${cy} Z" fill="${hair}"/>`;
+    if(v.hs===2)front=[...Array(7)].map((_,i)=>`<circle cx="${(cx-r+3+i*(2*r-6)/6).toFixed(1)}" cy="${(top+3).toFixed(1)}" r="4.6" fill="${hair}"/>`).join('');
+    else if(v.hs===3)front=`<path d="M${cx-r} ${cy-2} Q${cx} ${top-6} ${cx+r} ${cy-2} Q${cx} ${top+4} ${cx-r} ${cy-2} Z" fill="${hair}"/><circle cx="${cx}" cy="${top-3}" r="5" fill="${hair}"/>`;
+    else front=`<path d="M${cx-r} ${cy-1} Q${cx-r} ${top-3} ${cx} ${top-3} Q${cx+r} ${top-3} ${cx+r} ${cy-1} Q${cx+4} ${top+5} ${cx-r} ${cy-1} Z" fill="${hair}"/>`;
+  }
+  const ey=cy+1,eyeC=q.vamp?'#c0202a':'#2b2b2b';
+  const eyes=s.hea<20?`<path d="M${cx-8} ${ey} h4 M${cx+4} ${ey} h4" stroke="#2b2b2b" stroke-width="2" stroke-linecap="round"/>`:`<circle cx="${cx-6}" cy="${ey}" r="2.1" fill="${eyeC}"/><circle cx="${cx+6}" cy="${ey}" r="2.1" fill="${eyeC}"/>`;
+  const my=cy+8,mouth=s.hap>60?`M${cx-6} ${my} Q${cx} ${my+5} ${cx+6} ${my}`:s.hap>30?`M${cx-5} ${my+1} L${cx+5} ${my+1}`:`M${cx-6} ${my+3} Q${cx} ${my-2} ${cx+6} ${my+3}`;
+  const extra=(s.loo>=70?`<circle cx="${cx-9}" cy="${cy+5}" r="2.6" fill="#ff7a8a" opacity=".35"/><circle cx="${cx+9}" cy="${cy+5}" r="2.6" fill="#ff7a8a" opacity=".35"/>`:'')
+    +(s.sma>=85&&a>=6?`<g fill="none" stroke="#2b2b2b" stroke-width="1.3"><circle cx="${cx-6}" cy="${ey}" r="4"/><circle cx="${cx+6}" cy="${ey}" r="4"/><path d="M${cx-2} ${ey} h4"/></g>`:'')
+    +(!F&&a>=18&&v.bd?`<path d="M${cx-r+2} ${cy+3} Q${cx-r+3} ${cy+r+3} ${cx} ${cy+r+3} Q${cx+r-3} ${cy+r+3} ${cx+r-2} ${cy+3} Q${cx} ${cy+12} ${cx-r+2} ${cy+3} Z" fill="${hair}" opacity=".9"/>`:'')
+    +(a>=50?`<path d="M${cx-5} ${top+7} h10 M${cx-4} ${top+9.5} h8" stroke="#000" stroke-opacity=".18" stroke-width="1"/>`:'')
+    +(q.vamp?`<path d="M${cx-3} ${my+1} l1 3 l1 -3 M${cx+1} ${my+1} l1 3 l1 -3" fill="#fff" stroke="#fff" stroke-width=".8"/>`:'');
+  const shirt=q.jail?'#e8892b':SHIRTS[v.sh];
+  return `<svg viewBox="0 0 64 64"><defs><clipPath id="${id}"><circle cx="32" cy="32" r="31"/></clipPath></defs><circle cx="32" cy="32" r="31" fill="var(--sunk)" stroke="var(--line)"/><g clip-path="url(#${id})">${back}<path d="M10 66 Q12 ${cy+r+4} 32 ${cy+r+4} Q52 ${cy+r+4} 54 66 Z" fill="${shirt}"/>${q.jail?`<path d="M14 ${cy+r+9} H50 M12 ${cy+r+14} H52" stroke="#fff" stroke-opacity=".45" stroke-width="2"/>`:''}<rect x="28" y="${cy+r-4}" width="8" height="7" fill="${skin}"/><circle cx="${cx-r}" cy="${cy+2}" r="3" fill="${skin}"/><circle cx="${cx+r}" cy="${cy+2}" r="3" fill="${skin}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${skin}"/>${front}${eyes}<path d="${mouth}" stroke="#5a2a20" stroke-width="2" fill="none" stroke-linecap="round"/>${extra}</g></svg>`;
+}
+
+let SOUND=false;try{SOUND=!!localStorage.getItem('mv-sound')}catch(e){}
+let AC=null;
+function sfx(kind){if(!SOUND)return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  const seq={tick:[[660,.05]],pop:[[520,.06]],good:[[523,.08],[659,.08],[784,.14]],death:[[392,.18],[330,.18],[262,.32]]}[kind]||[[440,.05]];
+  let t=AC.currentTime;for(const [f,d] of seq){const o=AC.createOscillator(),gv=AC.createGain();o.type='sine';o.frequency.value=f;gv.gain.setValueAtTime(.05,t);gv.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(gv).connect(AC.destination);o.start(t);o.stop(t+d);t+=d*.9}}catch(e){}}
+const calm=()=>!window.matchMedia||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function celebrate(){sfx('good');if(calm()||typeof requestAnimationFrame==='undefined')return;
+  const cv=document.createElement('canvas');cv.className='confetti';document.body.appendChild(cv);
+  const w=cv.width=innerWidth,h=cv.height=innerHeight,ctx=cv.getContext('2d'),cs=getComputedStyle(document.documentElement);
+  const cols=['--accent','--amber','--good','--warn','--bad'].map(x=>cs.getPropertyValue(x).trim()||'#888');
+  const ps=[...Array(90)].map(()=>({x:w/2+R(-60,60),y:h*.35,vx:(Math.random()-.5)*9,vy:-Math.random()*9-3,s:R(5,9),c:pick(cols),r:Math.random()*6}));
+  let t=0;(function f(){ctx.clearRect(0,0,w,h);for(const q of ps){q.vy+=.25;q.x+=q.vx;q.y+=q.vy;q.r+=.2;ctx.save();ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.fillStyle=q.c;ctx.fillRect(-q.s/2,-q.s/2,q.s,q.s*.6);ctx.restore()}
+    if(++t<90)requestAnimationFrame(f);else cv.remove()})()}
+function shake(){sfx('death');const el=document.querySelector('.app');if(calm()||!el?.classList)return;el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake')}
+
+function copyText(text,title,note,back){
+  openModal(`<p class="eyebrow">${title}</p>${note?`<p class="muted">${note}</p>`:''}<textarea id="cp-t" class="cpbox" readonly rows="9"></textarea><div class="choices"><button class="btn" data-k="c">📋 Copiar</button><button class="btn ghost" data-k="b">Volver</button></div>`,{
+    c:()=>{const ta=$('#cp-t');const sel=()=>{ta.focus();ta.select();toast('Selecciona el texto y cópialo')};
+      try{navigator.clipboard.writeText(text).then(()=>toast('📋 Copiado'),sel)}catch(e){sel()}},b:back},false);
+  $('#cp-t').value=text;
+}
+function encodeSave(){const b=new TextEncoder().encode(JSON.stringify(S));let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode(...b.subarray(i,i+0x8000));return 'MV1:'+btoa(s)}
+function decodeSave(t){t=t.trim().replace(/^MV1:/,'');const bin=atob(t),b=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i);return JSON.parse(new TextDecoder().decode(b))}
+function pasteCode(){
+  openModal(`<p class="eyebrow">📥 Cargar partida</p><h2>Pega tu código</h2><p class="muted">La partida actual de esta ranura se sustituirá.</p><label for="pc-t" class="note">Código de partida</label><textarea id="pc-t" class="cpbox" rows="7" placeholder="MV1:…"></textarea><div class="choices"><button class="btn" data-k="ok">Cargar</button><button class="btn ghost" data-k="b">Volver</button></div>`,{
+    ok:()=>{let d=null;try{d=decodeSave($('#pc-t').value)}catch(e){}
+      if(!d||!d.p||!d.p.s)return toast('Ese código no es válido');
+      S=migrate(d);p=S.p;queue.length=0;tab='vida';save();render();closeModal();toast('📥 Partida cargada');if(!p.alive)showDeath()},b:mainMenu},false);
+}
+function storyText(){
+  const c=COUNTRIES[p.c].n,edu=['no fue a la escuela','terminó la primaria','terminó la secundaria',`estudió ${p.major}`][p.edu];
+  const kids=p.rels.filter(r=>r.role==='child').length,sp=p.rels.find(r=>r.role==='spouse'),rb=p.ribbon||ribbon();
+  const lines=[`${p.first} ${p.last} nació en ${p.born??NOW} y vivió ${p.age} años.`,`En los estudios, ${edu}.`];
+  if(p.retired)lines.push('Se jubiló después de toda una vida trabajando.');else if(p.job)lines.push(`Su último trabajo fue de ${jt(p.job).toLowerCase()}.`);
+  lines.push((sp?`Se casó con ${sp.first}`:(p.cnt.weds?'Se casó alguna vez':'Nunca se casó'))+(kids?` y tuvo ${kids} ${kids===1?'hijo':'hijos'}.`:'.'));
+  if(p.foll>=1000)lines.push(`Llegó a tener ${cfmt(p.foll)} seguidores.`);
+  if(p.record)lines.push(`Acumuló ${p.record} ${p.record===1?'antecedente':'antecedentes'} penales.`);
+  lines.push(`Murió a los ${p.age} años en ${c}, por ${p.cause}.`,`Su cinta: ${rb[0]} ${rb[1]}. ${rb[2]}`);
+  const items=[];for(const e of p.log)for(const l of e.lines)if(l.tone==='good'||l.tone==='bad')items.push(`· A los ${e.age}: ${l.t}`);
+  const step=Math.max(1,Math.ceil(items.length/8));const hi=items.filter((x,i)=>i%step===0).slice(0,8);
+  if(hi.length)lines.push('','Momentos de su vida:',...hi);
+  lines.push('','Vivido en Mil Vidas.');
+  return lines.join('\n');
+}
+
+const TUT=[
+ ['👋 Bienvenido a Mil Vidas','Vas a vivir una vida entera, año a año. Todo es gratis y está desbloqueado.'],
+ ['🎂 Cumple años','Pulsa el <b>botón naranja</b> de abajo para pasar de año. Cada año pasan cosas, y a veces tendrás que decidir.'],
+ ['🎯 Las pestañas','<b>Diario</b>: lo que te ha pasado. <b>Hacer</b>: actividades, redes, crimen y expansiones. <b>Carrera</b>: estudios y trabajo. <b>Gente</b>: familia y pareja. <b>Bienes</b>: dinero y compras. <b>Logros</b>: desafíos y ranking.'],
+ ['📊 Tus estadísticas','Arriba ves tu felicidad, salud, inteligencia, aspecto, estrés y forma física. Debajo, tus rasgos de personalidad.'],
+ ['🪄 Modo libre y ☰ Menú','Con el <b>modo libre</b> cambias lo que quieras. En el <b>menú</b> están tus partidas, el sonido, el desafío del día y el código para llevar tu partida a otro dispositivo.']];
+function tutorial(i=0){const [t,d]=TUT[i],last=i===TUT.length-1,end=()=>{try{localStorage.setItem('mv-tut','1')}catch(e){}closeModal()};
+  openModal(`<p class="eyebrow">Tutorial · ${i+1} de ${TUT.length}</p><h2>${t}</h2><p class="tut">${d}</p><div class="choices"><button class="btn" data-k="n">${last?'¡A jugar!':'Siguiente'}</button>${last?'':'<button class="btn ghost" data-k="s">Saltar el tutorial</button>'}</div>`,{n:()=>last?end():tutorial(i+1),s:end},false)}
+
+const todayStr=()=>new Date().toISOString().slice(0,10);
+function seeded(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19}
+  return ()=>{h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);h^=h>>>16;return (h>>>0)/4294967296}}
+function startDaily(){const orig=Math.random;Math.random=seeded('milvidas-'+todayStr());try{newLife({})}finally{Math.random=orig}
+  p.daily=todayStr();L('📆 Esta es la vida del desafío del día: todo el mundo empieza igual. ¿Quién llegará más lejos?','good');save();render();toast('📆 ¡Empieza el desafío del día!')}
+function dailyConfirm(){openModal(`<p class="eyebrow">📆 Desafío del día</p><h2>La misma vida para todos</h2><p class="muted">Hoy todo el mundo nace con el mismo nombre, país, año y rasgos. Cuando termine tu vida, entra en el ranking del día por edad alcanzada.${p&&p.alive?' Tu vida actual de esta ranura se perderá.':''}</p><div class="choices"><button class="btn" data-k="go">Empezar la vida de hoy</button><button class="btn ghost" data-k="b">Volver</button></div>`,{go:startDaily,b:mainMenu},false)}
+function mainMenu(){
+  openModal(`<p class="eyebrow">☰ Menú</p><h2>Mil Vidas</h2><div class="choices">
+    <button class="btn ghost" data-k="slots">💾 Partidas guardadas</button>
+    <button class="btn ghost" data-k="daily">📆 Desafío del día</button>
+    <button class="btn ghost" data-k="hall">🌍 Salón de la fama</button>
+    <button class="btn ghost" data-k="sound" aria-pressed="${SOUND}">${SOUND?'🔊 Sonido: activado':'🔇 Sonido: desactivado'}</button>
+    <button class="btn ghost" data-k="tut">❓ Ver el tutorial</button>
+    <button class="btn ghost" data-k="copy">📋 Copiar código de partida</button>
+    <button class="btn ghost" data-k="paste">📥 Cargar partida desde un código</button>
+    <button class="btn" data-k="x">Cerrar</button></div>`,{
+    slots:slotsMenu,daily:dailyConfirm,hall:()=>{closeModal();setTab('ach')},
+    sound:()=>{SOUND=!SOUND;try{localStorage.setItem('mv-sound',SOUND?'1':'')}catch(e){}sfx('good');mainMenu()},
+    tut:()=>tutorial(),copy:()=>copyText(encodeSave(),'📋 Código de tu partida','Guárdalo donde quieras. En otro dispositivo, usa «Cargar partida desde un código».',mainMenu),
+    paste:pasteCode,x:closeModal});
+}
+
+const INS=[{n:'Sin seguro',c:0,cov:0},{n:'Básico',c:600,cov:.5},{n:'Completo',c:1800,cov:.9}];
+const CHRONIC=['diabetes','hipertensión','asma','artritis','colesterol alto'];
+function healthYear(a){
+  const ins=INS[p.ins||0];
+  if(ins.c&&a>=18&&!p.jail){const c=ins.c*W();if(p.money>=c){p.money-=c;L(`📄 Pagas ${fmt(c)} de seguro médico (${ins.n.toLowerCase()}).`,'money')}else{p.ins=0;L('📄 No puedes pagar el seguro médico y te dan de baja.','bad')}}
+  p.chronic=p.chronic||[];
+  if(p.chronic.length&&p.treated!==a-1){st('hea',-R(0,2)*p.chronic.length);L(`💊 Sin tratamiento, tu ${p.chronic.join(' y tu ')} empeora${p.chronic.length>1?'n':''}.`,'bad')}
+  if(a>=35&&chance(.03*(has('healthy')?.4:1))){const nc=CHRONIC.filter(x=>!p.chronic.includes(x));if(nc.length){const d=pick(nc);p.chronic.push(d);L(`🩺 Te diagnostican ${d}. Es una enfermedad crónica: necesitarás tratamiento cada año.`,'bad')}}
+  if(p.s.hea<35&&a>=25&&!p.jail&&chance(.3)){const cost=20000*W()*(1-ins.cov);
+    special('🏥 Operación',`Los médicos recomiendan operarte. Te costaría ${fmt(cost)}${ins.cov?' con tu seguro':''}.`,[
+      ['Operarme',()=>{if(!pay(cost))p.debt+=cost;if(chance(.85)){st('hea',R(20,40));return '🏥 La operación sale bien. Te recuperas poco a poco.'}st('hea',-R(5,15));return '🏥 Hay complicaciones, pero sales adelante.'}],
+      ['No operarme',()=>(st('hea',-R(5,10)),'Decides no operarte. Tu salud sigue empeorando.')]])}
+}
+X.health=a=>{const ins=INS[p.ins||0];
+  if(a==='ins'){const map={};INS.forEach((x,i)=>map['i'+i]=()=>{p.ins=i;save();render();result(`📄 Ahora tienes: ${x.n.toLowerCase()}.`)});
+    return openModal(`<p class="eyebrow">📄 Seguro médico</p><h2>¿Qué seguro quieres?</h2><p class="muted">Se paga cada año. Abarata el médico, los tratamientos y las operaciones.</p><div class="choices">${INS.map((x,i)=>`<button class="btn ghost" data-k="i${i}">${x.n}${x.c?` · ${fmt(x.c*W())} al año · cubre el ${Math.round(x.cov*100)} %`:' · pagas todo tú'}${(p.ins||0)===i?' (actual)':''}</button>`).join('')}</div>`,map)}
+  if(a==='treat'){const c=1200*W()*(1-ins.cov);if(!pay(c))return result(`El tratamiento cuesta ${fmt(c)}.`);p.treated=p.age;st('hea',R(2,5));return done(`💊 Empiezas el tratamiento para tu ${p.chronic.join(' y tu ')}. Este año lo tienes controlado.`)}
+};
+
+const CLUBS=[['teatro','🎭'],['robótica','🤖'],['debate','🗣️'],['periódico escolar','📰'],['coro','🎶'],['ajedrez','♟️'],['deportes','⚽']];
+X.school=a=>{
+  if(a==='cool'){use('scool');if(chance(.45+p.s.loo/250+(has('funny')?.15:0))){p.cool=clamp((p.cool??40)+R(4,10),0,100);return done(pick(['😎 Te sientas en la mesa de los populares y te dejan quedarte.','😎 Tu nuevo corte de pelo causa sensación.','😎 Organizas una quedada y viene todo el mundo.']))}
+    p.cool=clamp((p.cool??40)-R(2,6),0,100);return done(pick(['😬 Intentas hacerte el gracioso y nadie se ríe.','😬 Te caes delante de toda la clase.']))}
+  if(a==='club'){use('sclub');const map={};CLUBS.forEach(([n,e],i)=>map['c'+i]=()=>{p.club=n;done(`${e} Te apuntas al club de ${n}.`)});
+    return openModal(`<p class="eyebrow">🏫 Clubes</p><h2>¿A qué club te apuntas?</h2><p class="muted">Cada año te da algo: talento, inteligencia, forma física o alguna afición.</p><div class="choices">${CLUBS.map(([n,e],i)=>`<button class="btn ghost" data-k="c${i}">${e} ${n[0].toUpperCase()+n.slice(1)}${p.club===n?' (actual)':''}</button>`).join('')}</div>`,map)}
+  if(a==='exchange'){const c=3000*W();if(!pay(c))return result(`El intercambio cuesta ${fmt(c)}.`);use('sx');inc('exch');
+    const nat=langOf(p.c),i=pick(COUNTRIES.map((x,j)=>j).filter(j=>langOf(j)!==nat)),l=langOf(i);p.langs[l]=Math.min(100,(p.langs[l]||0)+R(30,45));st('hap',12);const f=addFriend();
+    return done(`✈️ Pasas un curso de intercambio en ${COUNTRIES[i].n}. Aprendes muchísimo ${l.toLowerCase()} y te haces ${g('amigo','amiga')} de ${f.first}.`)}
+};
+function schoolYear(a){
+  if(p.club){if(!p.school&&!p.uni)p.club=null;else{const c=p.club;p.hob=p.hob||{};
+    if(c==='teatro'){if(p.actor)p.actor.sk=clamp(p.actor.sk+2,0,100);else st('loo',1)}
+    else if(c==='robótica'){st('sma',1);p.hob.code=Math.min(100,(p.hob.code||0)+3)}
+    else if(c==='debate')st('sma',1);
+    else if(c==='periódico escolar')p.hob.write=Math.min(100,(p.hob.write||0)+3);
+    else if(c==='coro'){if(p.pop)p.pop.sk=clamp(p.pop.sk+2,0,100);st('hap',1)}
+    else if(c==='ajedrez')p.hob.chess=Math.min(100,(p.hob.chess||0)+3);
+    else if(c==='deportes')p.athl=clamp(p.athl+3,0,100);
+    p.cool=clamp((p.cool??40)+1,0,100)}}
+  if(p.school)p.cool=clamp((p.cool??40)+R(-3,3),0,100);
+  if(a===17&&p.school&&!p.jail){const prom=()=>{st('hap',6);if((p.cool??40)>=70&&chance(.5)){st('hap',10);celebrate();return `👑 ¡Te coronan ${g('rey','reina')} del baile!`}return 'Bailas toda la noche. Una noche para recordar.'};
+    special('💃 Baile de graduación','Llega el baile de fin de curso del instituto.',[
+      ['Ir con mi pareja',()=>{const pt=partner();if(pt)pt.bond+=8;return pt?`Vas con ${pt.first}. `+prom():'Vas sin pareja, pero da igual. '+prom()}],
+      ['Ir con mis amigos',()=>prom()],
+      ['No ir',()=>(st('hap',-3),'Te lo pierdes. Al día siguiente todo el mundo habla del baile.')]])}
+}
+
+const HOLIDAYS=[
+ {t:'🎄 Navidad',txt:'Llega la Navidad y toda la familia se reúne.',ch:[
+  ['Ir a la cena familiar',()=>{parents().forEach(r=>r.bond+=4);st('hap',5);return pick(['Tu tío cuenta los mismos chistes de siempre. Te ríes igual.','Comes tanto que no puedes ni moverte.'])}],
+  ['Hacer regalos a todo el mundo',()=>{const c=Math.min(p.money,200);p.money-=c;p.rels.forEach(r=>{if(r.alive)r.bond+=3});st('hap',4);return 'Todos abren sus regalos con ilusión.'}],
+  ['Pasarla tranquilo en casa',()=>(addStress(-6),'Manta, película y chocolate caliente.')]]},
+ {t:'🎆 Nochevieja',min:6,txt:'Es la última noche del año.',ch:[
+  ['Ir a una gran fiesta',()=>{st('hap',6);return chance(.2)?(st('hea',-3),'Brindas, bailas… y amaneces con resaca.'):'Recibes el año nuevo bailando.'}],
+  ['Hacer propósitos de año nuevo',()=>(st('sma',1),addStress(-3),'Prometes ir más al gimnasio. Ya veremos.')],
+  ['Dormirme antes de las doce',()=>'Te despiertan los fuegos artificiales.']]},
+ {t:'🎃 Halloween',min:3,txt:'Llega Halloween.',ch:[
+  ['Disfrazarme',()=>(st('hap',5),`Vas de ${pick(['vampiro','momia','calabaza','astronauta','fantasma'])} y arrasas.`)],
+  ['Pedir caramelos por las casas',()=>(st('hap',4),'Vuelves con una bolsa llena de golosinas.')],
+  ['Quedarme en casa',()=>'Apagas las luces para que no llamen al timbre.']]},
+ {t:'🎂 Tu cumpleaños',txt:()=>`Cumples ${p.age} años.`,ch:[
+  ['Hacer una fiesta',()=>{st('hap',6);if(chance(.3)){const f=addFriend();return `Viene muchísima gente. Conoces a ${f.first}.`}return 'Soplas las velas rodeado de tus amigos.'}],
+  ['Celebrarlo en familia',()=>{parents().forEach(r=>r.bond+=5);st('hap',4);return 'Una tarta casera y muchos abrazos.'}],
+  ['Que pase desapercibido',()=>'Casi nadie se acuerda. Tu madre, sí.']]},
+ {t:'💘 San Valentín',min:14,txt:'Es el Día de los Enamorados.',ch:[
+  ['Sorprender a alguien',()=>{const pt=partner();if(pt){pt.bond+=8;st('hap',5);return `${pt.first} se emociona con tu sorpresa.`}
+    if(chance(.25+p.s.loo/300)){const c=addLove(person('partner',{sex:loveSex(),age:clamp(p.age+R(-3,3),14,99)}));st('hap',8);return `Le escribes una carta a ${c.first}… ¡y te dice que sí!`}st('hap',-3);return 'Mandas una carta anónima. No hay respuesta.'}],
+  ['Pasar del tema',()=>'Para ti es un día como cualquier otro.']]},
+ {t:'🎭 Carnaval',min:5,txt:'Llegan los carnavales.',ch:[
+  ['Salir en la comparsa',()=>(st('hap',6),st('hea',1),'Bailas por las calles hasta el amanecer.')],
+  ['Mirar el desfile',()=>(st('hap',3),'Acabas con confeti hasta en los calcetines.')]]}];
+
+let HALLDB=null,HALLUSER=null,hallDocs=[],hallNames={};
+async function initHall(){try{const c=window.claude;if(!c?.use)return;const db=await c.use('db');if(!db)return;HALLDB=db;HALLUSER=await c.use('user');
+  db.collection('hall').limit(300).onSnapshot(s=>{hallDocs=s.docs.map(d=>({id:d.id,...(d.data()||{})}));
+    if(HALLUSER)HALLUSER.profiles(hallDocs.map(d=>d.id)).then(ps=>{hallNames=ps||{};if(tab==='ach')render()});if(tab==='ach')render()},()=>{});
+  if(tab==='ach')render()}catch(e){}}
+async function submitHall(){try{if(!HALLDB||!HALLUSER)return;const uid=await HALLUSER.id();if(!uid)return;
+  const ref=HALLDB.doc('hall/'+uid),snap=await ref.get(),cur=snap.exists?snap.data():{};
+  const entry={n:`${p.first} ${p.last}`.slice(0,60),age:p.age,w:Math.round(worth()),f:Math.round(p.foll||0),c:p.c,rib:p.ribbon?.[0]||'🕊️',born:p.born??NOW,at:Date.now()};
+  const all=[...(Array.isArray(cur.lives)?cur.lives:[]),entry],keep=new Set();
+  for(const k of ['age','w','f'])[...all].sort((a,b)=>(b[k]||0)-(a[k]||0)).slice(0,5).forEach(x=>keep.add(x));
+  const body={lives:[...keep],ach:Object.keys(S.ach).length,at:Date.now()};
+  const today=todayStr();let daily=cur.daily&&cur.daily.d===today?cur.daily:null;
+  if(p.daily===today&&(!daily||p.age>daily.age))daily={d:today,age:p.age,w:Math.round(worth()),n:entry.n};
+  if(daily)body.daily=daily;
+  await ref.set(body)}catch(e){}}
+function renderHall(){
+  if(!HALLDB)return `<h3>🌍 Salón de la fama</h3><p class="note">El ranking compartido se activa al abrir el juego en claude.ai con tu cuenta.</p>`;
+  const all=hallDocs.flatMap(d=>(Array.isArray(d.lives)?d.lives:[]).map(l=>({...l,uid:d.id})));
+  const who=uid=>esc(hallNames[uid]?.name||'alguien');
+  const medal=i=>['🥇','🥈','🥉','4️⃣','5️⃣'][i];
+  const cat=(t,key,val)=>{const top=[...all].sort((a,b)=>(+b[key]||0)-(+a[key]||0)).slice(0,5);
+    return `<p class="eyebrow" style="margin-top:10px!important">${t}</p>`+(top.length?top.map((l,i)=>`<div class="row"><div class="lead"><span class="em" aria-hidden="true">${medal(i)}</span><div><b>${esc(l.rib)} ${esc(l.n)}</b><small>${val(l)} · ${esc(COUNTRIES[l.c]?.n||'')} · jugada por ${who(l.uid)}</small></div></div></div>`).join(''):'<p class="note">Todavía no hay vidas terminadas.</p>')};
+  const today=todayStr(),daily=hallDocs.filter(d=>d.daily?.d===today).map(d=>({...d.daily,uid:d.id})).sort((a,b)=>(+b.age||0)-(+a.age||0)).slice(0,5);
+  return `<h3>🌍 Salón de la fama</h3><p class="note">Las mejores vidas de quien juega esta página. Tu vida entra al terminar.</p>`
+    +cat('🐢 Las vidas más largas','age',l=>`${+l.age||0} años`)+cat('💰 Las más ricas','w',l=>fmtC(+l.w||0,+l.c||0))+cat('🌟 Las más famosas','f',l=>`${cfmt(+l.f||0)} seguidores`)
+    +`<p class="eyebrow" style="margin-top:10px!important">📆 Desafío de hoy</p>`+(daily.length?daily.map((l,i)=>`<div class="row"><div class="lead"><span class="em" aria-hidden="true">${medal(i)}</span><div><b>${esc(l.n)}</b><small>${+l.age||0} años · jugada por ${who(l.uid)}</small></div></div></div>`).join(''):'<p class="note">Nadie ha terminado aún la vida de hoy. Empiézala desde ☰ Menú.</p>');
+}
 
 /* ---------- gente ---------- */
 function relMenu(r){
@@ -1753,8 +1985,8 @@ function relAction(r,k,bio){
     case 'gift':if(!pay(50))return 'No tienes dinero para el regalo.';r.bond+=R(6,14);return `🎁 Le regalas ${pick(GIFTS)} a ${n}. Le encanta.`;
     case 'money':if(chance(r.bond/140)){const x=p.age<18?R(5,40):R(100,1500);p.money+=x;return `💵 ${n} te da ${fmt(x)}.`}r.bond-=4;return `${n} te dice que el dinero no cae de los árboles.`;
     case 'argue':r.bond-=R(8,20);st('hap',-R(1,4));return pick([`Discutís por política, ${n} y tú.`,`Discutís por quién friega los platos.`,`Os gritáis por una tontería.`]);
-    case 'propose':if(chance(r.bond/110)){r.role='spouse';inc('weds');st('hap',15);return pay(3000)?`💍 ¡${n} dice que sí! Os casáis en una boda preciosa.`:`💍 ¡${n} dice que sí! Os casáis en el juzgado, sin fiesta.`}r.bond-=10;st('hap',-10);return `${n} te dice que aún no está preparad${r.sex==='F'?'a':'o'}.`;
-    case 'baby':{if(bio){if(chance(.5)){const c=addChild();st('hap',12);return `👶 ¡Nace tu ${c.sex==='F'?'hija':'hijo'} ${c.first}!`}return 'Este año no hay suerte.'}if(!pay(3000))return 'No tenéis dinero para los trámites de adopción.';const c=addChild(R(0,2));st('hap',12);return `👶 Adoptáis a ${c.first}, ${c.sex==='F'?'una niña':'un niño'} de ${c.age} años.`}
+    case 'propose':if(chance(r.bond/110)){r.role='spouse';inc('weds');st('hap',15);celebrate();return pay(3000)?`💍 ¡${n} dice que sí! Os casáis en una boda preciosa.`:`💍 ¡${n} dice que sí! Os casáis en el juzgado, sin fiesta.`}r.bond-=10;st('hap',-10);return `${n} te dice que aún no está preparad${r.sex==='F'?'a':'o'}.`;
+    case 'baby':{if(bio){if(chance(.5)){const c=addChild();st('hap',12);celebrate();return `👶 ¡Nace tu ${c.sex==='F'?'hija':'hijo'} ${c.first}!`}return 'Este año no hay suerte.'}if(!pay(3000))return 'No tenéis dinero para los trámites de adopción.';const c=addChild(R(0,2));st('hap',12);return `👶 Adoptáis a ${c.first}, ${c.sex==='F'?'una niña':'un niño'} de ${c.age} años.`}
     case 'breakup':r.role='ex';p.rels=p.rels.filter(x=>x!==r);st('hap',-6);return `💔 Lo dejas con ${n}.`;
     case 'divorce':{const x=p.money/2;p.money-=x;r.role='ex';p.rels=p.rels.filter(y=>y!==r);st('hap',-12);grant('divorce');return `💔 Te divorcias de ${n}. Te cuesta ${fmt(x)}.`}
     case 'homework':{const s=r.st||(r.st={sma:50,hea:80,loo:50,hap:70});s.sma=clamp(s.sma+R(2,6),0,100);r.bond+=R(2,5);return `📚 Ayudas a ${n} con los deberes. Va mejorando en clase.`}
@@ -1829,11 +2061,12 @@ function showDeath(){
   const rb=p.ribbon||ribbon();
   const map={new:newLifeForm,revive:()=>{p.alive=true;p.s.hea=60;p.sick=null;queue.length=0;L('✨ Resucitas gracias al modo libre. Nadie se lo explica.','good');save();render();closeModal()}};
   kids.forEach(k=>map['k'+k.id]=()=>continueAs(k));
-  openModal(`<p class="eyebrow">🕊️ Descanse en paz</p><h2>${p.first} ${p.last}</h2><p class="muted">${p.age} años · ${COUNTRIES[p.c].n}</p><p>Murió por ${p.cause}.</p>
+  map.story=()=>copyText(storyText(),'📖 La historia de tu vida','Cópiala y compártela donde quieras.',showDeath);
+  openModal(`<div class="avatar big" aria-hidden="true">${avatarSVG(p)}</div><p class="eyebrow">🕊️ Descanse en paz</p><h2>${p.first} ${p.last}</h2><p class="muted">${p.age} años · ${COUNTRIES[p.c].n}</p><p>Murió por ${p.cause}.</p>
     <div class="banner"><p class="eyebrow">Cinta de esta vida</p><b>${rb[0]} ${rb[1]}</b><p class="muted" style="margin:2px 0 0">${rb[2]}</p></div>
     <dl class="sum" style="margin-top:12px"><dt>🎓 Estudios</dt><dd>${edu}</dd><dt>💎 Patrimonio</dt><dd>${fmt(worth())}</dd><dt>👶 Hijos</dt><dd>${p.rels.filter(r=>r.role==='child').length}</dd><dt>📱 Seguidores</dt><dd>${cfmt(p.foll)}</dd><dt>🚔 Antecedentes</dt><dd>${p.record}</dd><dt>⚖️ Fama</dt><dd>${verdict}</dd><dt>🪦 Vidas jugadas</dt><dd>${S.cemetery.length}</dd></dl>
     ${timeline()}<div class="choices">${kids.map(k=>`<button class="btn" data-k="k${k.id}">🧬 Seguir como ${k.first} (${k.age} años)</button>`).join('')}
-    <button class="btn ${kids.length?'ghost':''}" data-k="new">👶 Empezar una vida nueva</button><button class="btn ghost" data-k="revive">🪄 Revivir (modo libre)</button></div>`,map,false);
+    <button class="btn ${kids.length?'ghost':''}" data-k="new">👶 Empezar una vida nueva</button><button class="btn ghost" data-k="story">📖 Copiar mi historia</button><button class="btn ghost" data-k="revive">🪄 Revivir (modo libre)</button></div>`,map,false);
 }
 
 /* ---------- pintar ---------- */
@@ -1847,6 +2080,7 @@ function status(){
   if(p.job)return jt(p.job)+f;if(p.uni)return `Estudia ${p.uni.m}`+f;if(p.school)return p.school+f;if(p.retired)return g('Jubilado','Jubilada')+f;
   if(p.age<3)return 'Bebé';return (p.age<6?'Infancia':'Sin trabajo')+f}
 function renderTop(){
+  $('#avatar').innerHTML=avatarSVG(p);
   $('#name').textContent=`${p.first} ${p.last}`;
   $('#meta').textContent=`${p.age} ${p.age===1?'año':'años'} · 📅 ${yearNow()} · ${COUNTRIES[p.c].n} · ${status()}${p.foll>=100?` · 📱 ${cfmt(p.foll)}`:''}${S.gen>1?` · gen. ${S.gen}`:''}`;
   $('#cash').innerHTML=`${fmt(p.money)}${p.debt>0?`<span class="debt">deuda ${fmt(p.debt)}</span>`:''}`;
@@ -1970,7 +2204,7 @@ function invest(k){
 }
 function renderAch(){
   const n=ACH.filter(a=>S.ach[a.id]).length;
-  let h=renderGoals()+`<h3>🏆 Logros · ${n} de ${ACH.length}</h3><p class="note">Se guardan entre vidas.</p><div class="grid">`+ACH.map(a=>{const ok=S.ach[a.id];return `<div class="card ${ok?'':'locked'}"><span class="ico" aria-hidden="true">${ok?a.e:'🔒'}</span><b>${a.n}</b><small>${a.d}</small></div>`}).join('')+'</div>';
+  let h=renderHall()+renderGoals()+`<h3>🏆 Logros · ${n} de ${ACH.length}</h3><p class="note">Se guardan entre vidas.</p><div class="grid">`+ACH.map(a=>{const ok=S.ach[a.id];return `<div class="card ${ok?'':'locked'}"><span class="ico" aria-hidden="true">${ok?a.e:'🔒'}</span><b>${a.n}</b><small>${a.d}</small></div>`}).join('')+'</div>';
   const rib=Object.entries(S.ribbons);
   h+=`<h3>🎀 Cintas</h3>`+(rib.length?`<div class="btns">${rib.map(([k,v])=>`<span class="pill">${k} ×${v}</span>`).join('')}</div>`:'<p class="note">Cada vida que termina gana una cinta según cómo la viviste.</p>');
   h+=`<h3>🪦 Cementerio</h3>`+(S.cemetery.length?S.cemetery.slice(-12).reverse().map(c=>`<div class="row"><div class="lead"><span class="em" aria-hidden="true">${c.rib||'🕊️'}</span><div><b>${c.n}</b><small>${c.age} años · ${c.cause}</small></div></div></div>`).join(''):'<p class="note">Todavía no ha terminado ninguna vida.</p>');
@@ -2027,7 +2261,7 @@ $('#panel').addEventListener('click',e=>{
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.tab)});
 $('#btn-age').addEventListener('click',ageUp);
 $('#btn-new').addEventListener('click',newLifeForm);
-$('#btn-slots').addEventListener('click',slotsMenu);
+$('#btn-slots').addEventListener('click',mainMenu);
 $('#btn-free').addEventListener('click',()=>{if(p.alive)freeMode();else showDeath()});
 
 /* ---------- guardar ---------- */
@@ -2037,6 +2271,7 @@ function migrate(d){
   d.ach=d.ach||{};d.ribbons=d.ribbons||{};d.cemetery=d.cemetery||[];d.gen=d.gen||1;
   const q=d.p,def={traits:[],stress:10,addict:{},hob:{},goals:[],style:'equilibrado',grand:[],mob:null,biz:[],inv:{},undoc:false,fame:0,foll:0,monet:false,jail:null,fugitive:false,record:0,athl:R(10,40),cnt:{},everJob:!!q.job,karma:0,study:0,pension:0,pets:[],assets:[]};
   for(const k in def)if(q[k]===undefined)q[k]=def[k];
+  if(!q.av)q.av=makeAv();if(q.ins==null)q.ins=0;if(!q.chronic)q.chronic=[];if(q.cool==null)q.cool=40;
   if(!q.langs)q.langs={[langOf(q.c)]:100};if(q.born==null)q.born=NOW-q.age;if(!q.goals.length)q.goals=pickGoals();d.lineage=d.lineage||[];d.goalsDone=d.goalsDone||0;
   return d;
 }
@@ -2044,6 +2279,8 @@ try{window.claude?.hot?.snapshot?.(()=>S)}catch(e){}
 function start(data){
   const d=data&&data.p?data:load();
   if(d){S=migrate(d);p=S.p;render();if(!p.alive)showDeath()}else newLife();
+  initHall();
+  setTimeout(()=>{let seen=null;try{seen=localStorage.getItem('mv-tut')}catch(e){}if(!seen&&$('#overlay').hidden)tutorial()},400);
 }
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 </script>

@@ -14,3 +14,6 @@ Es una sola página web: abre `index.html` en el navegador para jugar. La partid
 - Minijuegos: exámenes de preguntas, tarjetas de memoria, citas y concurso de la tele.
 - Familia por generaciones, árbol genealógico, testamento, logros, cintas y desafíos.
 - Modo libre gratuito para cambiar lo que quieras.
+- Avatar que envejece contigo, animaciones, sonido opcional y tutorial.
+- Salud con seguro médico, enfermedades crónicas y operaciones; vida escolar con clubes, popularidad, intercambios y baile de graduación; fiestas del año.
+- Desafío del día, historia de tu vida para copiar, código de partida para cambiar de dispositivo y salón de la fama compartido (este último solo funciona dentro de claude.ai).
