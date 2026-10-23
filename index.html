@@ -387,7 +387,7 @@ const kidsOf=()=>p.rels.filter(r=>r.role==='child'&&r.alive);
 function jt(j){if(j.mil)return `${RANKS[Math.min(j.lvl,7)]} del ejército`;if(j.agent)return LV(AG_RANKS[Math.min(j.lvl,4)]);return j.t[p.sex==='F'?1:0]+(j.lvl&&!j.sport?` · nivel ${j.lvl+1}`:'')}
 const worth=()=>p.money-p.debt+p.assets.reduce((s,a)=>s+a.v,0)+(p.biz||[]).reduce((s,b)=>s+b.v,0)+Object.values(p.inv||{}).reduce((s,v)=>s+v,0);
 const cleanName=s=>(s||'').replace(/[^\p{L} '-]/gu,'').trim().slice(0,20);
-const uniCost=()=>UNI_COST*W();
+const uniCost=()=>UT(p.uni?.type).c*W();
 const assetE=a=>a.e||(a.k==='house'?'🏠':'🚗');
 function relE(r){if(!r.alive)return '🕊️';const F=r.sex==='F';
   return {parent:F?'👩':'👨',sibling:F?'👧':'👦',partner:'💕',spouse:'💍',child:r.age<3?'👶':F?'👧':'👦',friend:'🤝'}[r.role]||'🙂'}
@@ -535,6 +535,9 @@ function continueAs(kid){
   kids.filter(k=>k!==kid).forEach(k=>np.rels.push({...k,role:'sibling',id:uid()}));
   (old.grand||[]).filter(x=>x.pid===kid.id).forEach(x=>np.rels.push({id:uid(),role:'child',sex:x.sex,first:x.first,last:kid.last,age:x.age,bond:R(70,95),alive:true,loo:R(20,95)}));
   if(np.age>=18)np.edu=2;else if(np.age>=12){np.edu=1;np.school='Secundaria'}else if(np.age>=6)np.school='Primaria';
+  if(kid.major){np.edu=3;np.major=kid.major;np.uniType=kid.uniType}
+  if(kid.uni)np.uni={...kid.uni};
+  if(kid.job){const jj=JOBS.find(x=>x.t[0]===kid.job.t[0]);np.job={t:kid.job.t,e:jj?.e||'💼',sal:kid.job.sal,perf:60,yrs:0,pt:false,lvl:0,fam:!!jj?.fam,music:!!jj?.music};np.everJob=true}
   np.foll=Math.round(old.foll*.05);if(kid.ma){np.ma=kid.ma;np.maStyle='Kárate'}
   S.lineage=S.lineage||[];S.lineage.push({n:`${old.first} ${old.last}`,born:old.born??NOW,age:old.age,rib:old.ribbon?.[0]||'🕊️'});
   p=np;S.p=p;S.gen++;queue.length=0;
@@ -892,9 +895,9 @@ function runQueue(){
   openModal(`<p class="eyebrow">${p.age} años</p><h2>${ev.title||(p.jail?'⛓️ En prisión':'🎲 Algo pasa')}</h2><p>${ev._t}</p><div class="choices">${ev.ch.map((c,i)=>{const lb=typeof c[0]==='function'?c[0]():c[0];return lb?`<button class="btn ghost" data-k="c${i}">${lb}</button>`:''}).join('')}</div>`,map,false);
 }
 function special(title,txt,ch,cond){queue.push({title,_t:txt,ch,cond})}
-function enroll(m){p.uni={m:m.n,left:m.y};if(p.job&&!p.job.pt)p.job=null;return `${MAJOR_E[m.n]||'🎓'} Te matriculas en ${m.n}. Te esperan ${m.y} años de estudio.`}
+function enroll(m,t='pub'){p.uni={m:m.n,left:m.y,type:t};if(p.job&&!p.job.pt)p.job=null;return `${MAJOR_E[m.n]||'🎓'} Te matriculas en ${m.n}. Te esperan ${m.y} años de estudio.`}
 function retire(){p.pension=p.job.sal*.6;p.job=null;p.retired=true;st('hap',10);return `🏖️ Te jubilas. Cobrarás ${fmt(p.pension)} al año.`}
-function hire(j,extra={}){p.job={t:j.t,e:j.e,sal:j.sal*W()*(.9+Math.random()*.2)*(p.undoc?.7:1)*(speaks(langOf(p.c))?1:.8),perf:60,yrs:0,pt:!!j.pt,lvl:0,fam:!!j.fam,music:!!j.music,...extra};p.everJob=true;st('hap',6)}
+function hire(j,extra={}){p.job={t:j.t,e:j.e,sal:j.sal*W()*(.9+Math.random()*.2)*(p.undoc?.7:1)*(speaks(langOf(p.c))?1:.8)*(j.major&&j.major===p.major?UT(p.uniType).mult:1),perf:60,yrs:0,pt:!!j.pt,lvl:0,fam:!!j.fam,music:!!j.music,...extra};p.everJob=true;st('hap',6)}
 
 /* ---------- pasar el año ---------- */
 function ageUp(){
@@ -928,7 +931,8 @@ function ageUp(){
   if(a===12&&p.school==='Primaria'){p.edu=1;p.school='Secundaria';L('Terminas primaria y empiezas el instituto.')}
   if(a===18&&p.school==='Secundaria'){p.edu=2;p.school=null;L(`🎓 Te gradúas del instituto con una nota media de ${grade()}.`,'good');
     if(!p.jail)special('🎓 Fin del instituto','Has terminado el instituto. ¿Qué haces ahora?',[
-      ...MAJORS.map(m=>[`${MAJOR_E[m.n]} Estudiar ${m.n} (${m.y} años)`,()=>enroll(m)]),
+      ...MAJORS.map(m=>[`${MAJOR_E[m.n]} Estudiar ${m.n} en la pública (${m.y} años)`,()=>enroll(m)]),
+      ['🎓 Prefiero una universidad privada o de élite',()=>'Elige carrera y universidad en 💼 Carrera → Matricularme en la universidad.'],
       ['💼 Ponerme a trabajar',()=>'Decides buscar trabajo. Mira las ofertas en Carrera.'],
       ['🎖️ Alistarme en el ejército',()=>enlist()],
       ['🌴 Tomarme un año sabático',()=>(st('hap',6),'Un año para pensar y viajar un poco.')]])}
@@ -937,7 +941,7 @@ function ageUp(){
     const uc=uniCost();
     if(pay(uc))L(`Pagas ${fmt(uc)} de matrícula.`,'money');else{p.debt+=uc;L(`Pides un préstamo de ${fmt(uc)} para la matrícula.`,'money')}
     p.uni.left--;
-    if(p.uni.left<=0){p.edu=3;p.major=p.uni.m;p.uni=null;st('hap',10);L(`🎓 Terminas la carrera de ${p.major}. ¡${g('Graduado','Graduada')}!`,'good')}
+    if(p.uni.left<=0){p.edu=3;p.major=p.uni.m;p.uniType=p.uni.type||'pub';p.uni=null;st('hap',10);L(`🎓 Terminas la carrera de ${p.major}. ¡${g('Graduado','Graduada')}!`,'good')}
   }
   if(p.school||p.uni)st('sma',R(0,2));
   // trabajo
@@ -1624,7 +1628,7 @@ function yearLife(a){
     else{s.sma=clamp(s.sma+R(0,1),0,100);s.hap=clamp(s.hap+R(0,1),0,100)}}
   healthYear(a);schoolYear(a);
   if(a>=3&&!p.jail&&chance(.25)){const hd=pick(HOLIDAYS.filter(h=>a>=(h.min||0)));if(hd)special(hd.t,typeof hd.txt==='function'?hd.txt():hd.txt,hd.ch)}
-  spouseYear();
+  spouseYear();kidsUniYear();
   p.grand=p.grand||[];for(const x of p.grand)x.age++;
   for(const r of kidsOf())if(r.age>=20&&r.age<=45&&p.grand.length<15&&chance(.1)){const sx=pick(['M','F']),gk={id:uid(),first:pick(sx==='M'?MN:FN),sex:sx,age:0,pid:r.id,pn:r.first};
     p.grand.push(gk);st('hap',8);L(`👶 ¡${g('Eres abuelo','Eres abuela')}! ${r.first} tiene ${sx==='F'?'una niña':'un niño'}: ${gk.first}.`,'good')}
@@ -2121,6 +2125,53 @@ function murder(t){use('cmurder');p.karma-=25;addStress(30);inc('murders');st('h
   if(p.mob)mobResp(10);
   return `La policía investiga la muerte de ${who}, pero nunca encuentra al culpable. Tú sabes la verdad, y no te deja dormir.`}
 
+/* ---------- universidades y futuro de los hijos ---------- */
+const UNI_TYPES=[{k:'pub',e:'🏛️',n:'Pública',c:1800,mult:1,hire:0,d:'Barata, sueldos normales'},
+  {k:'priv',e:'🎓',n:'Privada',c:9000,mult:1.15,hire:.1,d:'Sueldos un 15 % más altos y más facilidad para encontrar trabajo'},
+  {k:'elite',e:'🏰',n:'De élite',c:25000,mult:1.35,hire:.2,min:75,d:'Sueldos un 35 % más altos y los mejores puestos'}];
+function UT(k){return UNI_TYPES.find(x=>x.k===(k||'pub'))||UNI_TYPES[0]}
+function uniTypePick(mn,years,sma,title,cb){const map={};
+  UNI_TYPES.forEach(t=>map[t.k]=()=>cb(t.k));
+  openModal(`<p class="eyebrow">${title}</p><h2>¿Qué universidad?</h2><p class="muted">${MAJOR_E[mn]||'🎓'} ${mn} · ${years} años. Se paga cada año de carrera.</p><div class="choices">${UNI_TYPES.map(t=>{const no=t.min&&sma<t.min;return `<button class="btn ghost" data-k="${t.k}" ${no?'disabled':''}>${t.e} ${t.n} · ${fmt(t.c*W())} al año (${fmt(t.c*W()*years)} en total) · ${no?`necesita inteligencia ${t.min}`:t.d}</button>`}).join('')}</div>`,map)}
+function kidSma(r){return (r.st||(r.st={sma:R(20,90),hea:R(70,100),loo:R(20,90),hap:R(60,95)})).sma}
+function pickWant(r){const s=kidSma(r);let m=pick(MAJORS).n;if(s<55&&['Medicina','Ingeniería','Derecho','Arquitectura'].includes(m))m=pick(MAJORS).n;r.want=m;return m}
+function kidEnroll(r,t,mn=r.want||pickWant(r)){const m=MAJORS.find(x=>x.n===mn)||MAJORS[0],T=UT(t);
+  if(T.min&&kidSma(r)<T.min)return `${r.first} no llega a la nota para una universidad de élite.`;
+  r.uni={m:m.n,left:m.y,type:t};r.asked=true;r.bond=clamp(r.bond+5,0,100);
+  return `${MAJOR_E[m.n]||'🎓'} ${r.first} empieza ${m.n} en una universidad ${T.n.toLowerCase()}. Pagarás ${fmt(T.c*W())} al año durante ${m.y} años.`}
+function kidJob(r){r.jobChecked=true;const s=kidSma(r);
+  const byMajor=r.major&&JOBS.filter(j=>j.major===r.major&&(!j.sma||s>=j.sma)&&j.min<=Math.max(r.age,24)).sort((a,b)=>a.sal-b.sal)[0];
+  const j=byMajor||pick(JOBS.filter(x=>!x.major&&!x.pt&&!x.hard&&!x.fame&&!x.sma&&!x.hea));
+  if(!byMajor&&chance(.15)){r.job=null;return}
+  const mult=byMajor?UT(r.uniType).mult:1;
+  r.job={t:j.t,sal:j.sal*W()*mult*(.85+Math.random()*.3)*(1+(s-60)/200)}}
+const kTitle=r=>r.job?r.job.t[r.sex==='F'?1:0]:'';
+function kidInfo(r){if(!r.alive||r.role!=='child')return '';
+  if(r.uni)return ` · 🎓 ${r.uni.m} (${UT(r.uni.type).n.toLowerCase()})`;
+  if(r.job)return ` · 💼 ${kTitle(r).toLowerCase()} (${fmt(r.job.sal)}/año)`;
+  if(r.major)return ` · 🎓 ${r.major}`;
+  if(r.want&&r.age>=12)return ` · sueña con estudiar ${r.want.toLowerCase()}`;
+  return ''}
+function kidsUniYear(){
+  for(const r of kidsOf()){const s=r.st||(r.st={sma:R(20,90),hea:R(70,100),loo:R(20,90),hap:R(60,95)});
+    if(r.age===12&&!r.want)L(`🎒 ${r.first} dice que de mayor quiere estudiar ${pickWant(r).toLowerCase()}.`);
+    else if(r.age===15&&r.want&&chance(.25)){const o=r.want;pickWant(r);if(r.want!==o)L(`🎒 ${r.first} cambia de idea: ahora quiere estudiar ${r.want.toLowerCase()}.`)}
+    if(r.age===18&&!r.asked&&!r.uni&&!r.major&&!p.jail){r.asked=true;const w=r.want||pickWant(r),m=MAJORS.find(x=>x.n===w)||MAJORS[0],sma=kidSma(r);
+      const ch=UNI_TYPES.filter(t=>!t.min||sma>=t.min).map(t=>[`${t.e} Universidad ${t.n.toLowerCase()} · ${fmt(t.c*W())} al año`,()=>kidEnroll(r,t.k)]);
+      ch.push(['💼 Que se ponga a trabajar',()=>{kidJob(r);return r.job?`${r.first} empieza a trabajar de ${kTitle(r).toLowerCase()}.`:`${r.first} busca trabajo, pero de momento no encuentra nada.`}]);
+      special(`🎓 La universidad de ${r.first}`,`${r.first} termina el instituto con una nota de ${(sma/10).toFixed(1)} y quiere estudiar ${w} (${m.y} años). ¿Dónde estudia?${sma<75?' Con su nota no le admiten en una de élite.':''}`,ch,()=>r.alive&&!r.uni)}
+    if(r.uni){const T=UT(r.uni.type),c=T.c*W();
+      if(!p.jail){if(pay(c))L(`🎓 Matrícula de ${r.first} (${r.uni.m}, ${T.n.toLowerCase()}): ${fmt(c)}.`,'money');else{p.debt+=c;L(`🎓 No te llega para la matrícula de ${r.first}: ${fmt(c)} pasan a deuda.`,'bad')}}
+      s.sma=clamp(s.sma+R(0,2),0,100);
+      if(s.sma<40&&chance(.1)){L(`🎓 ${r.first} deja la carrera de ${r.uni.m}.`,'bad');r.uni=null;r.asked=true;continue}
+      if(--r.uni.left<=0){r.major=r.uni.m;r.uniType=r.uni.type;r.uni=null;kidJob(r);
+        L(`🎓 ${r.first} se gradúa en ${r.major} en una universidad ${T.n.toLowerCase()}${r.job?` y consigue trabajo de ${kTitle(r).toLowerCase()} (${fmt(r.job.sal)} al año)`:''}.`,'good');st('hap',8)}}
+    else if(r.age>=19&&!r.job&&!r.jobChecked){kidJob(r);if(r.job)L(`💼 ${r.first} encuentra trabajo de ${kTitle(r).toLowerCase()}.`)}
+    if(r.job)r.job.sal*=1.03}}
+function kidUniPick(r){const map={};
+  MAJORS.forEach((m,i)=>map['m'+i]=()=>uniTypePick(m.n,m.y,kidSma(r),`🎓 Universidad de ${r.first}`,t=>done(kidEnroll(r,t,m.n))));
+  openModal(`<p class="eyebrow">🎓 Universidad de ${r.first}</p><h2>¿Qué estudia?</h2><p class="muted">${r.want?`Su sueño es estudiar ${r.want.toLowerCase()}. Si le obligas a otra cosa, os llevaréis peor.`:'Todavía no sabe qué quiere estudiar.'}</p><div class="choices">${MAJORS.map((m,i)=>`<button class="btn ghost" data-k="m${i}">${MAJOR_E[m.n]} ${m.n} · ${m.y} años${r.want===m.n?' · ⭐ lo que quiere':''}</button>`).join('')}</div>`,map)}
+
 /* ---------- gente ---------- */
 function relMenu(r){
   if(!r.alive)return result(`🕊️ ${r.first} falleció a los ${r.age} años. Le echas de menos.`);
@@ -2135,15 +2186,17 @@ function relMenu(r){
   if(r.role==='partner')acts.push(['breakup','Romper']);
   if(r.role==='spouse')acts.push(['divorce','Divorciarse']);
   if(r.role==='friend')acts.push(['unfriend','Dejar de ser amigos']);
+  if(r.role==='child'&&r.age>=10&&r.age<18&&!r.uni&&!r.major)acts.push(['kwant','💬 Preguntarle qué quiere estudiar']);
+  if(r.role==='child'&&r.age>=17&&r.age<=30&&!r.uni&&!r.major&&p.age>=18&&!p.jail)acts.push(['kuni','🎓 Elegir su universidad']);
   if(r.role==='child'&&r.age>=3&&r.age<18&&p.age>=18&&!p.jail)acts.push(['school',`${SCH(r).e} Colegio: ${SCH(r).n.toLowerCase()}`],['ksport',r.ks?`${KS(r).e} Deporte: ${KS(r).n}`:'⚽ Apuntarle a un deporte']);
   if(r.role==='child'&&r.age<18&&p.age>=18&&!p.jail)acts.push(['homework','📚 Ayudarle con los deberes'],['club',`⚽ Apuntarle a actividades (${fmt(300)})`],['spoil','🎁 Mimarle'],['ground','🚫 Castigarle']);
   if(pt&&p.age>=18&&!p.jail)acts.push(['date','🌹 Cita romántica']);
   if(r.role==='spouse'&&r.age<65&&!p.jail)acts.push(['spjob',r.job?'💼 Animarle a pedir un aumento':'💼 Animarle a buscar trabajo']);
   if(r.role==='spouse'&&!r.honey&&!p.jail)acts.push(['honey',`🌴 Luna de miel (${fmt(3000)})`]);
-  const once=['time','talk','gift','money','argue','baby','propose','homework','club','spoil','ground','date','spjob'];
+  const once=['time','talk','gift','money','argue','baby','propose','homework','club','spoil','ground','date','spjob','kwant'];
   const map={close:closeModal};
   acts.forEach(([k])=>map[k]=()=>{if(once.includes(k))use(r.id+k);const t=relAction(r,k,bio);r.bond=clamp(r.bond,0,100);done(t)});
-  map.school=()=>schoolPick(r);map.ksport=()=>kidSportPick(r);
+  map.school=()=>schoolPick(r);map.ksport=()=>kidSportPick(r);map.kuni=()=>kidUniPick(r);
   openModal(`<p class="eyebrow">${relE(r)} ${label(r)} · ${r.age} años</p><h2>${r.first} ${r.last}</h2>${bar('Relación',r.bond)}<div class="choices">${acts.map(([k,t])=>`<button class="btn ghost" data-k="${k}" ${once.includes(k)&&full(r.id+k)?'disabled':''}>${t}</button>`).join('')}<button class="btn" data-k="close">Cerrar</button></div>`,map);
 }
 function relAction(r,k,bio){
@@ -2160,6 +2213,7 @@ function relAction(r,k,bio){
     case 'divorce':{const x=p.money/2;p.money-=x;r.role='ex';p.rels=p.rels.filter(y=>y!==r);st('hap',-12);grant('divorce');return `💔 Te divorcias de ${n}. Te cuesta ${fmt(x)}.`}
     case 'spjob':if(r.job){if(chance(.5)){r.job.sal*=1.1;r.bond+=3;return `💼 ${n} pide un aumento y se lo dan. Ahora gana ${fmt(r.job.sal)} al año.`}return `💼 ${n} pide un aumento, pero su jefe le dice que no.`}
       if(chance(.5)){giveJob(r);if(r.job){r.bond+=3;return `💼 ${n} encuentra trabajo de ${spT(r).toLowerCase()}: ${fmt(r.job.sal)} al año.`}}return `💼 ${n} envía currículums, pero este año no hay suerte.`;
+    case 'kwant':{const w=r.want||pickWant(r);r.bond+=R(2,5);return `💬 ${n} te cuenta que sueña con estudiar ${w.toLowerCase()}.`}
     case 'homework':{const s=r.st||(r.st={sma:50,hea:80,loo:50,hap:70});s.sma=clamp(s.sma+R(2,6),0,100);r.bond+=R(2,5);return `📚 Ayudas a ${n} con los deberes. Va mejorando en clase.`}
     case 'club':{if(!pay(300))return 'No tienes dinero para la inscripción.';const s=r.st||(r.st={sma:50,hea:80,loo:50,hap:70});s.hea=clamp(s.hea+R(2,6),0,100);s.hap=clamp(s.hap+R(2,6),0,100);r.bond+=R(2,6);return `⚽ Apuntas a ${n} a ${pick(['fútbol','natación','teatro','robótica','música'])}. Le encanta.`}
     case 'spoil':{const s=r.st||(r.st={sma:50,hea:80,loo:50,hap:70});s.hap=clamp(s.hap+R(3,8),0,100);s.sma=clamp(s.sma-R(0,2),0,100);r.bond+=R(4,8);return `🎁 Mimas a ${n} con caprichos. Está feliz, aunque un poco consentid${r.sex==='F'?'a':'o'}.`}
@@ -2301,9 +2355,9 @@ function renderCareer(){
   let h='<h3>🎒 Estudios</h3>';
   if(p.age<6)h+=`<p class="muted">Aún no vas al colegio.</p>`;
   else if(p.school)h+=`<div class="row"><div><b>📘 ${p.school}</b><small>Nota media ${grade()}</small></div><div class="btns"><button class="btn small" data-edu="study" ${full('study')?'disabled':''}>Estudiar más${left('study')}</button><button class="btn small ghost" data-edu="skip" ${full('skip')?'disabled':''}>Hacer novillos</button></div></div>`;
-  else if(p.uni)h+=`<div class="row"><div><b>${MAJOR_E[p.uni.m]||'🎓'} Carrera de ${p.uni.m}</b><small>Te ${p.uni.left===1?'queda 1 año':`quedan ${p.uni.left} años`} · ${fmt(uniCost())} al año</small></div><div class="btns"><button class="btn small" data-edu="study" ${full('study')?'disabled':''}>Estudiar más${left('study')}</button><button class="btn small ghost" data-edu="drop">Dejarla</button></div></div>`;
+  else if(p.uni)h+=`<div class="row"><div><b>${MAJOR_E[p.uni.m]||'🎓'} Carrera de ${p.uni.m}</b><small>Universidad ${UT(p.uni.type).n.toLowerCase()} · Te ${p.uni.left===1?'queda 1 año':`quedan ${p.uni.left} años`} · ${fmt(uniCost())} al año</small></div><div class="btns"><button class="btn small" data-edu="study" ${full('study')?'disabled':''}>Estudiar más${left('study')}</button><button class="btn small ghost" data-edu="drop">Dejarla</button></div></div>`;
   else{
-    h+=`<p class="muted">${['Sin estudios.','Tienes la primaria.','Tienes la secundaria.',`Tienes la carrera de ${p.major}.`][p.edu]}</p>`;
+    h+=`<p class="muted">${['Sin estudios.','Tienes la primaria.','Tienes la secundaria.',`Tienes la carrera de ${p.major} (universidad ${UT(p.uniType).n.toLowerCase()}).`][p.edu]}</p>`;
     if(p.age>=18&&p.edu>=2)h+=`<button class="btn small" data-edu="uni">🎓 Matricularme en la universidad</button>`;
     if(p.age>=18&&p.edu<2)h+=`<button class="btn small" data-edu="adult" ${full('adult')?'disabled':''}>Sacarme la secundaria para adultos (${fmt(500)})</button>`;
   }
@@ -2325,7 +2379,7 @@ function renderCareer(){
   return h+renderLearn()+renderSpecial();
 }
 function renderPeople(){
-  const row=r=>`<button class="row person ${r.alive?'':'dead'}" data-rel="${r.id}"><div class="lead"><span class="em" aria-hidden="true">${relE(r)}</span><div><b>${r.first} ${r.last.split(' ')[0]}</b><small>${label(r)} · ${r.alive?`${r.age} años`:`† a los ${r.age}`}${r.role==='spouse'&&r.alive?(r.job?` · 💼 ${spT(r).toLowerCase()} (${fmt(r.job.sal)}/año)`:r.pension?' · jubilación':' · sin trabajo'):''}${r.role==='child'&&r.alive&&r.age>=6&&r.age<18?` · ${SCH(r).e} ${SCH(r).n.toLowerCase()}${r.ks?` · ${KS(r).e}`:''}`:''}</small></div></div>${r.alive?`<div class="bondbar">${bar('',r.bond)}</div>`:''}</button>`;
+  const row=r=>`<button class="row person ${r.alive?'':'dead'}" data-rel="${r.id}"><div class="lead"><span class="em" aria-hidden="true">${relE(r)}</span><div><b>${r.first} ${r.last.split(' ')[0]}</b><small>${label(r)} · ${r.alive?`${r.age} años`:`† a los ${r.age}`}${r.role==='spouse'&&r.alive?(r.job?` · 💼 ${spT(r).toLowerCase()} (${fmt(r.job.sal)}/año)`:r.pension?' · jubilación':' · sin trabajo'):''}${r.role==='child'&&r.alive&&r.age>=6&&r.age<18?` · ${SCH(r).e} ${SCH(r).n.toLowerCase()}${r.ks?` · ${KS(r).e}`:''}`:''}${kidInfo(r)}</small></div></div>${r.alive?`<div class="bondbar">${bar('',r.bond)}</div>`:''}</button>`;
   const grp=(t,f)=>{const l=p.rels.filter(f);return l.length?`<h3>${t}</h3>${l.map(row).join('')}`:''};
   let h=`<div class="btns" style="margin-top:10px">${btn('fam','tree','🌳 Árbol genealógico',0,1)}${kidsOf().length?btn('fam','style',`👪 Crianza: ${p.style||'equilibrado'}`,0,1):''}</div>`+grp('🏡 Familia',r=>r.role==='parent'||r.role==='sibling')+grp('❤️ Pareja',r=>r.role==='partner'||r.role==='spouse')+grp('🧸 Hijos',r=>r.role==='child')+grp('🤝 Amigos',r=>r.role==='friend');
   if(p.grand?.length)h+=`<h3>👶 Nietos</h3>`+p.grand.map(x=>`<div class="row"><div class="lead"><span class="em" aria-hidden="true">${x.age<3?'👶':x.sex==='F'?'👧':'👦'}</span><div><b>${x.first}</b><small>${x.sex==='F'?'Nieta':'Nieto'} · ${x.age} años · de ${x.pn}</small></div></div></div>`).join('');
@@ -2404,7 +2458,7 @@ $('#panel').addEventListener('click',e=>{
   if(d.sp==='train'){use('train');p.athl=clamp(p.athl+R(3,8)+(p.s.hea>70?2:0),0,100);st('hea',R(1,3));return done(pick(['🏃 Sales a correr al amanecer.','⚽ Entrenas con el equipo hasta tarde.','🏊 Haces largos en la piscina municipal.']))}
   if(d.sp==='try')return tryout();
   if(d.apply){const j=JOBS[+d.apply];use('apply');
-    const ok=chance(j.hard?.2+p.s.loo/400+fame()/300:clamp(.55+(p.s.sma-50)/200,.2,.9));
+    const ok=chance(j.hard?.2+p.s.loo/400+fame()/300:clamp(.55+(p.s.sma-50)/200+(j.major&&j.major===p.major?UT(p.uniType).hire:0),.2,.95));
     if(ok){hire(j);return done(`${j.e} ¡Te contratan de ${j.t[p.sex==='F'?1:0].toLowerCase()}! Cobrarás ${fmt(p.job.sal)} al año.`)}
     return done(`No te cogen para ${j.t[p.sex==='F'?1:0].toLowerCase()}. Prueba otra vez.`)}
   if(d.job){const j=p.job;
@@ -2417,7 +2471,7 @@ $('#panel').addEventListener('click',e=>{
     if(d.edu==='skip'){use('skip');if(chance(.3)){parents().forEach(r=>r.bond-=8);return done('Te pillan haciendo novillos. Tus padres se enfadan.')}st('hap',5);st('sma',-1);return done('Pasas el día en el parque con tus amigos.')}
     if(d.edu==='drop'){p.uni=null;st('hap',2);return done('Dejas la carrera.')}
     if(d.edu==='adult'){if(!pay(500))return result(`Necesitas ${fmt(500)} para la matrícula.`);use('adult');if(chance(.4+p.s.sma/200)){p.edu=2;return done('🎓 Apruebas y consigues el título de secundaria.')}return done('Suspendes. Puedes intentarlo el año que viene.')}
-    if(d.edu==='uni'){const map={};MAJORS.forEach((m,i)=>map['m'+i]=()=>done(enroll(m)));
+    if(d.edu==='uni'){const map={};MAJORS.forEach((m,i)=>map['m'+i]=()=>uniTypePick(m.n,m.y,p.s.sma,'🎓 Tu universidad',t=>done(enroll(m,t))));
       return openModal(`<p class="eyebrow">🎓 Universidad</p><h2>¿Qué quieres estudiar?</h2><p class="muted">${fmt(uniCost())} al año. Si no te llega, pides un préstamo.</p><div class="choices">${MAJORS.map((m,i)=>`<button class="btn ghost" data-k="m${i}">${MAJOR_E[m.n]} ${m.n} · ${m.y} años</button>`).join('')}</div>`,map)}}
   if(d.sell){const a=p.assets.splice(+d.sell,1)[0];p.money+=a.v;return done(`💵 Vendes ${a.n.toLowerCase()} por ${fmt(a.v)}.`)}
   if(d.cat){shopCat=+d.cat;const sc=$('#panel').scrollTop;render();$('#panel').scrollTop=sc;return}
